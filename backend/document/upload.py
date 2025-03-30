@@ -1,6 +1,7 @@
 from fastapi import UploadFile, File
 from pathlib import Path
 from typing import List
+from uuid import uuid4
 
 
 class Upload:
@@ -12,9 +13,11 @@ class Upload:
         pass
 
     async def local_upload(self, files: List[UploadFile] = File(...)):
+
         try:
             saved_files = []
             for file in files:
+                uuid = str(uuid.uuid4())
                 # Create a safe filename
                 file_path = self.UPLOAD_DIR / file.filename
 

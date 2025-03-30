@@ -1,13 +1,14 @@
-import os
-from typing import List
-from langchain.schema import Document
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_postgres import PGVector
-from uuid import uuid4
+from pydantic import BaseModel
+import os
 
 
-class Embeddings:
+class SearchRequest(BaseModel):
+    query: str
+
+
+class Search:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(
             api_key=os.environ["OPENAI_API_KEY"],
@@ -23,8 +24,5 @@ class Embeddings:
             use_jsonb=True,
         )
 
-    def embed_docs(self, docs: List[Document]):
-        document_ids = self.pgvector.add_documents(
-            docs, ids=[str(uuid4()) for _ in docs]
-        )
-        return [document_ids]
+    def search(self, query: SearchRequest):
+        return self.pgvector.similarity_search(query.query)

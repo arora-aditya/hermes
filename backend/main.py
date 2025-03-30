@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi import UploadFile
 from fastapi import File
 from document.ingest import IngestRequest
+from document.search import SearchRequest
 from document.app import App
 import uvicorn
 from dotenv import load_dotenv
@@ -30,6 +31,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/api/search")
+def search(request: SearchRequest):
+    return document.search_files(request)
 
 
 @app.post("/api/uploadfiles")
