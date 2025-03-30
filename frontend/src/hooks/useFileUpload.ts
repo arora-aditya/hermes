@@ -5,13 +5,17 @@ import { toast } from 'sonner';
 export interface FileUploadState {
     isUploading: boolean;
     progress: number;
+    totalFiles: number;
+    uploadedFiles: number;
 }
 
-export const useFileUpload = () => {
+export const useFileUpload = (onUploadComplete?: () => void) => {
     const [isOpen, setIsOpen] = useState(false);
     const [uploadState, setUploadState] = useState<FileUploadState>({
         isUploading: false,
         progress: 0,
+        totalFiles: 0,
+        uploadedFiles: 0,
     });
 
     const handleUpload = async (files: FileList | null) => {
@@ -20,27 +24,36 @@ export const useFileUpload = () => {
             return;
         }
 
-        setUploadState({ isUploading: true, progress: 0 });
+        setUploadState({
+            isUploading: true,
+            progress: 0,
+            totalFiles: files.length,
+            uploadedFiles: 0,
+        });
 
         try {
             const fileArray = Array.from(files);
             const responses = await apiService.uploadMultipleFiles(fileArray);
-
             const successCount = responses.filter(r => r.success).length;
             const failureCount = responses.length - successCount;
-
             if (failureCount === 0) {
-                toast.success(`Successfully uploaded ${successCount} file${successCount > 1 ? 's' : ''}`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                setIsOpen(false);
             } else {
                 toast.error(`Failed to upload ${failureCount} file${failureCount > 1 ? 's' : ''}`);
+                setIsOpen(false);
             }
-
-            setIsOpen(false);
         } catch (error) {
-            console.error('Upload error:', error);
             toast.error('Failed to upload files');
+            setIsOpen(false);
         } finally {
-            setUploadState({ isUploading: false, progress: 0 });
+            onUploadComplete?.();
+            setUploadState({
+                isUploading: false,
+                progress: 0,
+                totalFiles: 0,
+                uploadedFiles: 0,
+            });
         }
     };
 

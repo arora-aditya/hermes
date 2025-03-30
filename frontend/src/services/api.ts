@@ -36,8 +36,8 @@ class ApiService {
         const formData = new FormData();
         formData.append('files', file);
 
-        const response = await axios.post<UploadResponse>(
-            `${API_BASE_URL}/uploadfiles`,
+        const response = await this.api.post<UploadResponse>(
+            '/uploadfiles',
             formData,
             {
                 headers: {
@@ -45,17 +45,40 @@ class ApiService {
                 },
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total ?? 100));
-                    // You can use this for progress tracking if needed
                     console.log(`Upload Progress: ${percentCompleted}%`);
                 },
             }
         );
-        return response.data;
+
+        // Ensure we have a properly formatted response
+        const data = response.data;
+        if (!data || typeof data.success !== 'boolean') {
+            throw new Error('Invalid response format from server');
+        }
+        return data;
     }
 
     async uploadMultipleFiles(files: File[]): Promise<UploadResponse[]> {
-        const uploadPromises = files.map(file => this.uploadFile(file));
-        return Promise.all(uploadPromises);
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+
+        const response = await this.api.post<UploadResponse[]>(
+            '/uploadfiles',
+            formData,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total ?? 100));
+                    console.log(`Upload Progress: ${percentCompleted}%`);
+                },
+            }
+        );
+
+        return response.data;
     }
 }
 

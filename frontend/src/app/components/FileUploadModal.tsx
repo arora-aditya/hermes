@@ -6,8 +6,12 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { Progress } from '@/components/ui/progress';
 import { Upload } from 'lucide-react';
 
-export function FileUploadModal() {
-    const { isOpen, setIsOpen, uploadState, handleUpload } = useFileUpload();
+interface FileUploadModalProps {
+    onUploadComplete: () => void;
+}
+
+export function FileUploadModal({ onUploadComplete }: FileUploadModalProps) {
+    const { isOpen, setIsOpen, uploadState, handleUpload } = useFileUpload(onUploadComplete);
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -41,9 +45,14 @@ export function FileUploadModal() {
                         {uploadState.isUploading && (
                             <div className="space-y-2">
                                 <Progress value={uploadState.progress} className="w-full" />
-                                <p className="text-sm text-muted-foreground text-center">
-                                    Uploading... {uploadState.progress}%
-                                </p>
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        Uploading {uploadState.totalFiles} file{uploadState.totalFiles !== 1 ? 's' : ''}...
+                                    </p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        Progress: {uploadState.progress}%
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>

@@ -4,11 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useFiles } from '@/hooks/useFiles';
+import { FileInfo } from '@/services/api';
 
-export function FileList() {
-    const { files, selectedFiles, loading, toggleFileSelection, handleIndex } = useFiles();
+interface FileListProps {
+    files: FileInfo[];
+    selectedFiles: Set<number>;
+    loading: boolean;
+    toggleFileSelection: (document_id: number) => void;
+    handleIndex: () => Promise<void>;
+}
 
+export function FileList({ files, selectedFiles, loading, toggleFileSelection, handleIndex }: FileListProps) {
     if (loading) {
         return <div className="p-4">Loading files...</div>;
     }
@@ -19,7 +25,7 @@ export function FileList() {
             <ScrollArea className="h-[calc(100vh-200px)]">
                 <div className="space-y-2">
                     {files.map((file) => (
-                        <div key={file.path} className="flex items-center space-x-2">
+                        <div key={file.id} className="flex items-center space-x-2">
                             <Checkbox
                                 checked={selectedFiles.has(file.id)}
                                 onCheckedChange={() => toggleFileSelection(file.id)}

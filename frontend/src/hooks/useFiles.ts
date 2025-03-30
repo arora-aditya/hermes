@@ -24,7 +24,6 @@ export const useFiles = () => {
     };
 
     const toggleFileSelection = (document_id: number) => {
-        console.log('toggleFileSelection', document_id);
         setSelectedFiles(prev => {
             const newSelected = new Set(prev);
             if (newSelected.has(document_id)) {
@@ -53,5 +52,6 @@ export const useFiles = () => {
         loading,
         toggleFileSelection,
         handleIndex,
+        fetchFiles,
     };
 }; 

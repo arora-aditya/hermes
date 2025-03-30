@@ -2,14 +2,23 @@
 
 import { FileList } from './components/FileList';
 import { FileUploadModal } from './components/FileUploadModal';
+import { useFiles } from '@/hooks/useFiles';
 
 export default function Home() {
+  const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles();
+
   return (
-    <main className="flex min-h-screen">
-      <FileList />
+    <div className="flex min-h-screen">
+      <FileList
+        files={files}
+        selectedFiles={selectedFiles}
+        loading={loading}
+        toggleFileSelection={toggleFileSelection}
+        handleIndex={handleIndex}
+      />
       <div className="flex-1 p-4">
         <div className="flex justify-end">
-          <FileUploadModal />
+          <FileUploadModal onUploadComplete={fetchFiles} />
         </div>
         {/* Main content area */}
         <div className="mt-16">
@@ -19,6 +28,6 @@ export default function Home() {
           </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

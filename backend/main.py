@@ -62,7 +62,7 @@ def search(request: SearchRequest):
 
 @app.post("/api/uploadfiles")
 async def upload_files(
-    files: List[UploadFile] = File(...), db_session: AsyncSession = Depends(get_db)
+    files: List[UploadFile] = [File(...)], db_session: AsyncSession = Depends(get_db)
 ):
     return await document.upload_local(files, db_session)
 
