@@ -120,6 +120,7 @@ class ApiService {
 
     async getConversations(): Promise<Conversation[]> {
         const response = await this.api.get<Conversation[]>('/chat/conversations/2');
+        console.log('response', response.data);
         return response.data;
     }
 

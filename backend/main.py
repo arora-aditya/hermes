@@ -90,7 +90,7 @@ async def chat(conversation_id: str, db_session: AsyncSession = Depends(get_db))
 @app.get("/api/chat/conversations/{user_id}")
 async def chat(user_id: str, db_session: AsyncSession = Depends(get_db)):
     conversations = await agent.get_conversations(db_session, user_id)
-    return {"data": conversations}
+    return conversations
 
 
 if __name__ == "__main__":

@@ -8,11 +8,11 @@ export const useChat = (initialConversationId?: string) => {
 
     useEffect(() => {
         // Only load initial conversation if conversationId is provided
-        if (conversationId) {
+        if (initialConversationId) {
             const loadConversation = async () => {
                 setIsLoading(true);
                 try {
-                    const conversation = await apiService.getConversation(conversationId);
+                    const conversation = await apiService.getConversation(initialConversationId);
                     if (conversation.messages) {
                         setMessages(conversation.messages);
                     }
@@ -25,7 +25,7 @@ export const useChat = (initialConversationId?: string) => {
 
             loadConversation();
         }
-    }, [conversationId]);
+    }, [initialConversationId]);
 
     const sendMessage = async (content: string) => {
         setIsLoading(true);
