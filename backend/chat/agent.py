@@ -5,10 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.conversation import Message, ConversationHistory
 from uuid import UUID
-
-
-class ConversationRequest(BaseModel):
-    conversation_id: UUID4
+from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage
+from chat.conversation import ConversationService
 
 
 class ChatRequest(BaseModel):
@@ -32,106 +31,32 @@ class Agent:
             max_retries=2,
             api_key=os.environ.get("GEMINI_API_KEY"),
         )
+        self.llm = FakeListChatModel(
+            responses=["This is a test response from the fake chat model."]
+        )
         self.system_prompt = {
             "role": "system",
             "content": os.getenv("GEMINI_SYSTEM_PROMPT"),
         }
 
-    async def save_message(
-        self, db: AsyncSession, content: str, role: str, conversation_id: UUID
-    ) -> Message:
-        message = Message(conversation_id=conversation_id, content=content, role=role)
-        db.add(message)
-        await db.flush()  # This will populate the message_id
-        return message
-
-    async def get_or_create_conversation(
-        self, db: AsyncSession, user_id: str, conversation_id: UUID | None = None
-    ) -> ConversationHistory:
-        if conversation_id:
-            # Try to find existing conversation
-            stmt = select(ConversationHistory).where(
-                ConversationHistory.conversation_id == conversation_id,
-                ConversationHistory.user_id == user_id,
-            )
-            result = await db.execute(stmt)
-            conversation = result.scalar_one_or_none()
-
-            if not conversation:
-                # Create new conversation with provided UUID
-                conversation = ConversationHistory(
-                    user_id=user_id, conversation_id=conversation_id
-                )
-                db.add(conversation)
-                await db.flush()
-        else:
-            # Create new conversation with auto-generated UUID
-            conversation = ConversationHistory(user_id=user_id)
-            db.add(conversation)
-            await db.flush()
-
-        return conversation
-
-    async def get_conversations(
-        self, db: AsyncSession, user_id: str
-    ) -> list[ConversationHistory]:
-        stmt = select(ConversationHistory).where(ConversationHistory.user_id == user_id)
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
-    async def get_conversation_messages(
-        self, db: AsyncSession, conversation: ConversationRequest
-    ) -> list[Message]:
-        # Get all messages for the conversation ordered by message_id
-        stmt = (
-            select(Message)
-            .where(Message.conversation_id == conversation.conversation_id)
-            .order_by(Message.message_id)
-        )
-        result = await db.execute(stmt)
-        return result.scalars().all()
-
     async def chat(self, request: ChatRequest, db: AsyncSession):
-        # Get or create conversation
-        conversation = await self.get_or_create_conversation(
-            db, request.user_id, request.conversation_id
+        # Get messages prepared for LLM
+        messages = await ConversationService.prepare_messages_for_llm(
+            db, request.conversation_id, self.system_prompt
         )
 
-        # Save user message
-        user_message = await self.save_message(
-            db,
-            content=request.message,
-            role="user",
-            conversation_id=conversation.conversation_id,
-        )
-
-        # Get all messages from the conversation history
-        conversation_messages = await self.get_conversation_messages(
-            db, ConversationRequest(conversation_id=conversation.conversation_id)
-        )
-
-        # Prepare messages for the model
-        messages = [self.system_prompt]  # Start with system prompt
-        messages.extend(
-            [
-                {"role": msg.role, "content": msg.content}
-                for msg in conversation_messages
-            ]
-        )
         # Get response from the model
         response = self.llm.invoke(messages)
 
-        # Save assistant message
-        assistant_message = await self.save_message(
-            db,
-            content=response.content,
-            role="assistant",
-            conversation_id=conversation.conversation_id,
+        # Process the complete chat interaction
+        conversation = await ConversationService.process_chat_interaction(
+            db=db,
+            user_id=request.user_id,
+            message=request.message,
+            conversation_id=request.conversation_id,
+            system_prompt=self.system_prompt,
+            llm_response=response.content,
         )
-
-        # Update conversation with last message
-        conversation.last_message_id = assistant_message.message_id
-        await db.commit()
 
         return ChatResponse(
             message=response.content, conversation_id=conversation.conversation_id

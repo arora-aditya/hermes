@@ -5,29 +5,25 @@ import { useFiles } from '@/hooks/useFiles';
 import { ChatHistory } from './components/ChatHistory';
 import { ChatInput } from './components/ChatInput';
 import { useChat } from '@/hooks/useChat';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ConversationHistory } from './components/ConversationHistory';
 
 export default function Home() {
   const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles();
-  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>('34f76c29-cf93-472f-8259-7fd2fd58db7d');
-  const { messages, isLoading, sendMessage, resetConversation } = useChat(currentConversationId);
+  const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat();
 
-  // Reset conversation on first load
   useEffect(() => {
     resetConversation();
-  }, [currentConversationId]);
-
-  const handleConversationSelect = (conversationId: string) => {
-    console.log('conversationId', conversationId);
-    setCurrentConversationId(conversationId);
-  };
+  }, []);
 
   return (
     <div className="flex h-screen">
       <ConversationHistory
-        onSelectConversation={handleConversationSelect}
-        currentConversationId={currentConversationId}
+        conversations={conversations}
+        isLoadingConversations={isLoadingConversations}
+        onSelectConversation={setCurrentConversation}
+        onDeleteConversation={deleteConversation}
+        currentConversationId={conversationId || undefined}
         files={files}
         selectedFiles={selectedFiles}
         loading={loading}
@@ -35,7 +31,13 @@ export default function Home() {
         handleIndex={handleIndex}
       />
       <div className="flex-1 flex flex-col">
-        <div className="flex justify-end p-4 border-b">
+        <div className="flex justify-end p-4 border-b gap-2">
+          <button
+            onClick={createConversation}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            New Conversation
+          </button>
           <FileUploadModal onUploadComplete={fetchFiles} />
         </div>
         <div className="flex-1 flex flex-col relative">

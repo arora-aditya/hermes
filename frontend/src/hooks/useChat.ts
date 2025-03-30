@@ -29,21 +29,45 @@ export const useChat = (initialConversationId?: string) => {
         }
     }, [initialConversationId]);
 
+    const createConversation = async () => {
+        try {
+            const data = await apiService.createConversation('2');
+            // Update all related state in a single batch
+            setMessages([]);
+            setConversations(prev => [data, ...prev]);
+            setConversationId(data.conversation_id);
+            return data;
+        } catch (error) {
+            console.error('Error creating conversation:', error);
+            throw error;
+        }
+    }
+
+
+    const deleteConversation = async (conversationId: string) => {
+        const data = await apiService.deleteConversation(conversationId);
+        setConversations(conversations.filter(conversation => conversation.conversation_id !== conversationId));
+        setConversationId(null);
+        return data;
+    }
+
+    const loadConversations = async () => {
+        setIsLoadingConversations(true);
+        try {
+            const data = await apiService.getConversations();
+            setConversations(data);
+            return data;
+        } catch (error) {
+            console.error('Failed to fetch conversations:', error);
+            setConversations([]);
+            return [];
+        } finally {
+            setIsLoadingConversations(false);
+        }
+    };
+
     useEffect(() => {
         // Load conversations on mount
-        const loadConversations = async () => {
-            setIsLoadingConversations(true);
-            try {
-                const data = await apiService.getConversations();
-                setConversations(data);
-            } catch (error) {
-                console.error('Failed to fetch conversations:', error);
-                setConversations([]);
-            } finally {
-                setIsLoadingConversations(false);
-            }
-        };
-
         loadConversations();
     }, []);
 
@@ -65,11 +89,6 @@ export const useChat = (initialConversationId?: string) => {
                 user_id: '2' // TODO: Replace with actual user ID
             });
 
-            // If this is the first message, set the conversation ID
-            if (!conversationId) {
-                setConversationId(response.conversation_id);
-            }
-
             const assistantMessage: Message = {
                 message_id: Date.now() + 1, // Temporary ID until server response
                 conversation_id: response.conversation_id,
@@ -86,10 +105,22 @@ export const useChat = (initialConversationId?: string) => {
         }
     };
 
+    const setCurrentConversation = async (newConversationId: string | undefined) => {
+        setConversationId(newConversationId || null);
+        if (newConversationId) {
+            const conversation = await apiService.getConversation(newConversationId);
+            if (conversation.messages) {
+                setMessages(conversation.messages);
+            }
+        } else {
+            setMessages([]);
+        }
+    };
 
-    const resetConversation = () => {
+    const resetConversation = async () => {
         setMessages([]);
         setConversationId(null);
+        await loadConversations();
     };
 
     return {
@@ -99,6 +130,9 @@ export const useChat = (initialConversationId?: string) => {
         resetConversation,
         conversationId,
         conversations,
-        isLoadingConversations
+        isLoadingConversations,
+        setCurrentConversation,
+        createConversation,
+        deleteConversation
     };
 } 

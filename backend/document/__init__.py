@@ -1,3 +1,0 @@
-"""
-Document package initialization
-"""

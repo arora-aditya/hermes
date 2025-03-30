@@ -120,12 +120,21 @@ class ApiService {
 
     async getConversations(): Promise<Conversation[]> {
         const response = await this.api.get<Conversation[]>('/chat/conversations/2');
-        console.log('response', response.data);
+        return response.data;
+    }
+
+    async createConversation(user_id: string): Promise<Conversation> {
+        const response = await this.api.post<Conversation>(`/chat/conversation/${user_id}`);
         return response.data;
     }
 
     async getConversation(conversationId: string): Promise<ConversationResponse> {
         const response = await this.api.get<ConversationResponse>(`/chat/conversation/${conversationId}`);
+        return response.data;
+    }
+
+    async deleteConversation(conversationId: string): Promise<Conversation> {
+        const response = await this.api.delete<Conversation>(`/chat/conversation/${conversationId}`);
         return response.data;
     }
 }

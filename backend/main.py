@@ -1,9 +1,7 @@
-from fastapi import FastAPI, Depends
-from fastapi import UploadFile
-from fastapi import File
+from fastapi import FastAPI, Depends, File, UploadFile
 from chat.agent import ChatRequest
-from chat.agent import ConversationRequest
 from chat.agent import Agent
+from chat.conversation import ConversationService
 from document.ingest import IngestRequest
 from document.search import SearchRequest
 from document.app import App
@@ -14,6 +12,7 @@ from typing import List
 from document.database import Database
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 load_dotenv()
 
@@ -79,18 +78,35 @@ async def chat(request: ChatRequest, db_session: AsyncSession = Depends(get_db))
     return await agent.chat(request, db_session)
 
 
+@app.post("/api/chat/conversation/{user_id}")
+async def create_conversation(user_id: str, db_session: AsyncSession = Depends(get_db)):
+    return await ConversationService.create_conversation(db_session, user_id)
+
+
 @app.get("/api/chat/conversation/{conversation_id}")
-async def chat(conversation_id: str, db_session: AsyncSession = Depends(get_db)):
-    conversation = await agent.get_conversation_messages(
-        db_session, ConversationRequest(conversation_id=conversation_id)
+async def get_conversation_messages(
+    conversation_id: UUID, db_session: AsyncSession = Depends(get_db)
+):
+    messages = await ConversationService.get_conversation_messages(
+        db_session, conversation_id
     )
-    return {"messages": conversation}
+    return {"messages": messages}
 
 
 @app.get("/api/chat/conversations/{user_id}")
-async def chat(user_id: str, db_session: AsyncSession = Depends(get_db)):
-    conversations = await agent.get_conversations(db_session, user_id)
-    return conversations
+async def list_conversations(user_id: str, db_session: AsyncSession = Depends(get_db)):
+    return await ConversationService.list_conversations(db_session, user_id)
+
+
+@app.delete("/api/chat/conversation/{conversation_id}")
+async def delete_conversation(
+    conversation_id: UUID, db_session: AsyncSession = Depends(get_db)
+):
+    success = await ConversationService.delete_conversation(
+        db_session, conversation_id
+    )
+    await db_session.commit()
+    return {"success": success}
 
 
 if __name__ == "__main__":
