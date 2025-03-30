@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends
 from fastapi import UploadFile
 from fastapi import File
+from chat.agent import ChatRequest
+from chat.agent import Agent
 from document.ingest import IngestRequest
 from document.search import SearchRequest
 from document.app import App
@@ -28,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 document = App()
+agent = Agent()
 
 
 # Make the database session available as a dependency
@@ -70,6 +73,11 @@ async def upload_files(
 @app.get("/api/listfiles")
 async def list_files(db_session: AsyncSession = Depends(get_db)):
     return await document.list_files(db_session)
+
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+    return agent.chat(request)
 
 
 if __name__ == "__main__":
