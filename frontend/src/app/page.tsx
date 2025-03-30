@@ -9,8 +9,9 @@ import { useEffect } from 'react';
 import { ConversationHistory } from './components/ConversationHistory';
 
 export default function Home() {
-  const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles();
-  const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat();
+  const userId = 1;
+  const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles(userId);
+  const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat(userId);
 
   useEffect(() => {
     resetConversation();
@@ -38,7 +39,7 @@ export default function Home() {
           >
             New Conversation
           </button>
-          <FileUploadModal onUploadComplete={fetchFiles} />
+          <FileUploadModal userId={userId} onUploadComplete={fetchFiles} />
         </div>
         <div className="flex-1 flex flex-col relative">
           <div className="absolute inset-0 flex flex-col">

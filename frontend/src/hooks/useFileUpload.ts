@@ -9,7 +9,7 @@ export interface FileUploadState {
     uploadedFiles: number;
 }
 
-export const useFileUpload = (onUploadComplete?: () => void) => {
+export const useFileUpload = (userId: number, onUploadComplete?: () => void) => {
     const [isOpen, setIsOpen] = useState(false);
     const [uploadState, setUploadState] = useState<FileUploadState>({
         isUploading: false,
@@ -33,7 +33,7 @@ export const useFileUpload = (onUploadComplete?: () => void) => {
 
         try {
             const fileArray = Array.from(files);
-            const responses = await apiService.uploadMultipleFiles(fileArray);
+            const responses = await apiService.uploadMultipleFiles(userId, fileArray);
             const successCount = responses.filter(r => r.success).length;
             const failureCount = responses.length - successCount;
             if (failureCount === 0) {

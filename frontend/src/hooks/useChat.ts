@@ -1,37 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Message, apiService, ChatResponse, Conversation } from '../services/api';
 
-export const useChat = (initialConversationId?: string) => {
+export const useChat = (userId: number) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [conversationId, setConversationId] = useState<string | null>(initialConversationId || null);
+    const [conversationId, setConversationId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
-    useEffect(() => {
-        // Only load initial conversation if conversationId is provided
-        if (initialConversationId) {
-            const loadConversation = async () => {
-                setIsLoading(true);
-                try {
-                    const conversation = await apiService.getConversation(initialConversationId);
-                    if (conversation.messages) {
-                        setMessages(conversation.messages);
-                    }
-                } catch (error) {
-                    console.error('Error loading conversation:', error);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
-            loadConversation();
-        }
-    }, [initialConversationId]);
-
     const createConversation = async () => {
         try {
-            const data = await apiService.createConversation('2');
+            const data = await apiService.createConversation(userId);
             // Update all related state in a single batch
             setMessages([]);
             setConversations(prev => [data, ...prev]);

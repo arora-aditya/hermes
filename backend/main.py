@@ -1,21 +1,17 @@
 from load_env import IS_ENV_LOADED
-from fastapi import FastAPI, Depends, File, UploadFile
+from fastapi import FastAPI, Depends
 from chat.agent import ChatRequest
 from chat.agent import Agent
 from chat.conversation import ConversationService
-from document.ingest import IngestRequest
-from document.search import SearchRequest
-from document.app import App
-import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
-from document.database import Database
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from uuid import UUID
-from controller import users, organizations
-from document.database import get_db
+from controller import users, organizations, documents
+from utils.database import get_db
 from models.relationships import setup_relationships
+import uvicorn
 
 
 @asynccontextmanager
@@ -32,7 +28,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-document = App()
 agent = Agent()
 
 
@@ -47,35 +42,12 @@ app.add_middleware(
 # Include routers with /api prefix
 app.include_router(users.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
+app.include_router(documents.router)  # Documents router already has /api prefix
 
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-
-
-@app.post("/api/ingest")
-async def ingest(request: IngestRequest, db_session: AsyncSession = Depends(get_db)):
-    return await document.digest(request, db_session)
-
-
-@app.post("/api/search")
-def search(request: SearchRequest):
-    return document.search_files(request)
-
-
-@app.post("/api/uploadfiles/{user_id}")
-async def upload_files(
-    user_id: str,
-    files: List[UploadFile] = [File(...)],
-    db_session: AsyncSession = Depends(get_db),
-):
-    return await document.upload_local(user_id, files, db_session)
-
-
-@app.get("/api/listfiles")
-async def list_files(db_session: AsyncSession = Depends(get_db)):
-    return await document.list_files(db_session)
 
 
 @app.post("/api/chat")

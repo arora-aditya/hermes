@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FileInfo, apiService } from '@/services/api';
 import { toast } from 'sonner';
 
-export const useFiles = () => {
+export const useFiles = (userId: number) => {
     const [files, setFiles] = useState<FileInfo[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ export const useFiles = () => {
 
     const fetchFiles = async () => {
         try {
-            const files = await apiService.listFiles();
+            const files = await apiService.listFiles(userId);
             setFiles(files);
         } catch (error) {
             console.error('Error fetching files:', error);
@@ -37,7 +37,7 @@ export const useFiles = () => {
 
     const handleIndex = async () => {
         try {
-            await apiService.ingestFiles(Array.from(selectedFiles));
+            await apiService.ingestFiles(userId, Array.from(selectedFiles));
             setSelectedFiles(new Set());
             toast.success('Files indexed successfully');
         } catch (error) {

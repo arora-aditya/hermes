@@ -7,11 +7,12 @@ import { Progress } from '@/components/ui/progress';
 import { Upload } from 'lucide-react';
 
 interface FileUploadModalProps {
+    userId: number;
     onUploadComplete: () => void;
 }
 
-export function FileUploadModal({ onUploadComplete }: FileUploadModalProps) {
-    const { isOpen, setIsOpen, uploadState, handleUpload } = useFileUpload(onUploadComplete);
+export function FileUploadModal({ userId, onUploadComplete }: FileUploadModalProps) {
+    const { isOpen, setIsOpen, uploadState, handleUpload } = useFileUpload(userId, onUploadComplete);
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

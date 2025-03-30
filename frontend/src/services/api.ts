@@ -55,21 +55,21 @@ class ApiService {
         },
     });
 
-    async listFiles(): Promise<FileInfo[]> {
-        const response = await this.api.get<{ files: FileInfo[] }>('/listfiles');
-        return response.data.files;
+    async listFiles(userId: number): Promise<FileInfo[]> {
+        const response = await this.api.get<FileInfo[]>(`/documents/${userId}`);
+        return response.data;
     }
 
-    async ingestFiles(files: number[]): Promise<void> {
-        await this.api.post('/ingest', { document_ids: files });
+    async ingestFiles(userId: number, files: number[]): Promise<void> {
+        await this.api.post(`/documents/ingest?user_id=${userId}`, { document_ids: files });
     }
 
-    async uploadFile(file: File): Promise<UploadResponse> {
+    async uploadFile(userId: number, file: File): Promise<UploadResponse> {
         const formData = new FormData();
         formData.append('files', file);
 
         const response = await this.api.post<UploadResponse>(
-            '/uploadfiles',
+            `/documents/upload?user_id=${userId}`,
             formData,
             {
                 headers: {
@@ -90,14 +90,14 @@ class ApiService {
         return data;
     }
 
-    async uploadMultipleFiles(files: File[]): Promise<UploadResponse[]> {
+    async uploadMultipleFiles(userId: number, files: File[]): Promise<UploadResponse[]> {
         const formData = new FormData();
         files.forEach(file => {
             formData.append('files', file);
         });
 
         const response = await this.api.post<UploadResponse[]>(
-            '/uploadfiles',
+            `/documents/upload?user_id=${userId}`,
             formData,
             {
                 headers: {
@@ -123,7 +123,7 @@ class ApiService {
         return response.data;
     }
 
-    async createConversation(user_id: string): Promise<Conversation> {
+    async createConversation(user_id: number): Promise<Conversation> {
         const response = await this.api.post<Conversation>(`/chat/conversation/${user_id}`);
         return response.data;
     }
