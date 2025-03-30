@@ -15,7 +15,9 @@ class Upload:
     async def s3_upload(self, files: List[UploadFile] = File(...)):
         pass
 
-    async def local_upload(self, db: AsyncSession, files: List[UploadFile] = File(...)):
+    async def local_upload(
+        self, db: AsyncSession, user_id: str, files: List[UploadFile] = File(...)
+    ):
         try:
             saved_files = []
             for file in files:
@@ -32,6 +34,7 @@ class Upload:
                     filename=file.filename,
                     file_path=str(file_path.absolute()),
                     is_ingested=False,
+                    user_id=user_id,
                 )
                 print(doc)
                 db.add(doc)

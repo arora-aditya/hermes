@@ -17,8 +17,8 @@ class App:
         self.upload = Upload()
         self.search = Search()
 
-    async def upload_local(self, files: List[UploadFile], db: AsyncSession):
-        return await self.upload.local_upload(db, files)
+    async def upload_local(self, user_id: str, files: List[UploadFile], db: AsyncSession):
+        return await self.upload.local_upload(db, user_id, files)
 
     async def list_files(self, db: AsyncSession):
         return await self.upload.list_files(db)

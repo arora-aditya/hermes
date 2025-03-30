@@ -1,3 +1,4 @@
+from load_env import IS_ENV_LOADED
 from fastapi import FastAPI, Depends, File, UploadFile
 from chat.agent import ChatRequest
 from chat.agent import Agent
@@ -6,21 +7,25 @@ from document.ingest import IngestRequest
 from document.search import SearchRequest
 from document.app import App
 import uvicorn
-from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 from document.database import Database
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from uuid import UUID
-
-load_dotenv()
-
-db = Database()
+from controller import users, organizations
+from document.database import get_db
+from models.relationships import setup_relationships
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not IS_ENV_LOADED:
+        raise Exception("Environment variables not loaded")
+
+    # Set up SQLAlchemy relationships
+    setup_relationships()
+
     yield
     # Shutdown
     pass
@@ -31,10 +36,17 @@ document = App()
 agent = Agent()
 
 
-# Make the database session available as a dependency
-async def get_db():
-    async for session in db.get_session():
-        yield session
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Add your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers with /api prefix
+app.include_router(users.router, prefix="/api")
+app.include_router(organizations.router, prefix="/api")
 
 
 @app.get("/")
@@ -47,25 +59,18 @@ async def ingest(request: IngestRequest, db_session: AsyncSession = Depends(get_
     return await document.digest(request, db_session)
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Add your frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 @app.post("/api/search")
 def search(request: SearchRequest):
     return document.search_files(request)
 
 
-@app.post("/api/uploadfiles")
+@app.post("/api/uploadfiles/{user_id}")
 async def upload_files(
-    files: List[UploadFile] = [File(...)], db_session: AsyncSession = Depends(get_db)
+    user_id: str,
+    files: List[UploadFile] = [File(...)],
+    db_session: AsyncSession = Depends(get_db),
 ):
-    return await document.upload_local(files, db_session)
+    return await document.upload_local(user_id, files, db_session)
 
 
 @app.get("/api/listfiles")
@@ -102,9 +107,7 @@ async def list_conversations(user_id: str, db_session: AsyncSession = Depends(ge
 async def delete_conversation(
     conversation_id: UUID, db_session: AsyncSession = Depends(get_db)
 ):
-    success = await ConversationService.delete_conversation(
-        db_session, conversation_id
-    )
+    success = await ConversationService.delete_conversation(db_session, conversation_id)
     await db_session.commit()
     return {"success": success}
 

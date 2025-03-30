@@ -23,3 +23,12 @@ class Database:
 
     def get_db_url(self):
         return self.DATABASE_URL
+
+
+db = Database()
+
+
+# Make the database session available as a dependency
+async def get_db():
+    async for session in db.get_session():
+        yield session

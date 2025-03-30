@@ -28,6 +28,13 @@ if config.config_file_name is not None:
 from models.base import Base
 from models.document import Document
 from models.conversation import Message, ConversationHistory
+from models.user import User
+from models.organization import Organization
+from models.user_document import UserDocument
+from models.relationships import setup_relationships
+
+# Set up relationships
+setup_relationships()
 
 # target metadata
 target_metadata = Base.metadata
