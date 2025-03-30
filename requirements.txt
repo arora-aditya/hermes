@@ -18,6 +18,7 @@ exceptiongroup==1.2.2
 fastapi==0.115.12
 fastapi-cli==0.0.7
 frozenlist==1.5.0
+greenlet==3.1.1
 h11==0.14.0
 httpcore==1.0.7
 httptools==0.6.4
@@ -49,6 +50,8 @@ pgvector==0.3.6
 propcache==0.3.1
 psycopg==3.2.6
 psycopg-pool==3.2.6
+psycopg2==2.9.10
+pycryptodome==3.15.0
 pydantic==2.11.1
 pydantic-settings==2.8.1
 pydantic_core==2.33.0

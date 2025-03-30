@@ -21,8 +21,8 @@ export function FileList() {
                     {files.map((file) => (
                         <div key={file.path} className="flex items-center space-x-2">
                             <Checkbox
-                                checked={selectedFiles.has(file.path)}
-                                onCheckedChange={() => toggleFileSelection(file.path)}
+                                checked={selectedFiles.has(file.id)}
+                                onCheckedChange={() => toggleFileSelection(file.id)}
                             />
                             <span className="text-sm truncate" title={file.filename}>
                                 {file.filename}

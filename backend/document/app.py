@@ -6,6 +6,7 @@ from document.ingest import IngestRequest
 from document.search import Search, SearchRequest
 from fastapi import UploadFile, File
 from typing import List
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class App:
@@ -16,17 +17,17 @@ class App:
         self.upload = Upload()
         self.search = Search()
 
-    async def upload_local(self, files: List[UploadFile] = File(...)):
-        return await self.upload.local_upload(files)
+    async def upload_local(self, files: List[UploadFile], db: AsyncSession):
+        return await self.upload.local_upload(db, files)
 
-    def list_files(self):
-        return self.upload.list_files()
+    async def list_files(self, db: AsyncSession):
+        return await self.upload.list_files(db)
 
     def search_files(self, query: SearchRequest):
         return self.search.search(query)
 
-    def digest(self, request: IngestRequest):
-        docs = self.ingest.ingest_docs(request.url)
+    async def digest(self, request: IngestRequest, db: AsyncSession):
+        docs = await self.ingest.ingest_docs(request.document_ids, db)
         chunks = self.chunk.chunk_docs(docs)
         embeddings = self.embeddings.embed_docs(chunks)
         return {

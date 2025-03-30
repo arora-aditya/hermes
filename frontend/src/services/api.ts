@@ -3,6 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = 'http://localhost:8000/api';
 
 export interface FileInfo {
+    id: number;
     filename: string;
     path: string;
     size: number;
@@ -27,8 +28,8 @@ class ApiService {
         return response.data.files;
     }
 
-    async ingestFiles(files: string[]): Promise<void> {
-        await this.api.post('/ingest', { files });
+    async ingestFiles(files: number[]): Promise<void> {
+        await this.api.post('/ingest', { document_ids: files });
     }
 
     async uploadFile(file: File): Promise<UploadResponse> {

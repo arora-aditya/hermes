@@ -2,9 +2,9 @@ import os
 from typing import List
 from langchain.schema import Document
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_postgres import PGVector
 from uuid import uuid4
+from .database import Database
 
 
 class Embeddings:
@@ -15,11 +15,11 @@ class Embeddings:
                 "OPENAI_TEXT_EMBEDDING_MODEL", "text-embedding-3-small"
             ),
         )
-        self.connection = f"postgresql+psycopg://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
+        self.db = Database()
         self.pgvector = PGVector(
             embeddings=self.embeddings,
             collection_name="my_docs",
-            connection=self.connection,
+            connection=self.db.get_db_url(),
             use_jsonb=True,
         )
 

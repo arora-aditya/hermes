@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 export const useFiles = () => {
     const [files, setFiles] = useState<FileInfo[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+    const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -23,13 +23,14 @@ export const useFiles = () => {
         }
     };
 
-    const toggleFileSelection = (path: string) => {
+    const toggleFileSelection = (document_id: number) => {
+        console.log('toggleFileSelection', document_id);
         setSelectedFiles(prev => {
             const newSelected = new Set(prev);
-            if (newSelected.has(path)) {
-                newSelected.delete(path);
+            if (newSelected.has(document_id)) {
+                newSelected.delete(document_id);
             } else {
-                newSelected.add(path);
+                newSelected.add(document_id);
             }
             return newSelected;
         });
