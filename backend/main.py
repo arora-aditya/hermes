@@ -76,8 +76,8 @@ async def list_files(db_session: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/chat")
-def chat(request: ChatRequest):
-    return agent.chat(request)
+async def chat(request: ChatRequest, db_session: AsyncSession = Depends(get_db)):
+    return await agent.chat(request, db_session)
 
 
 if __name__ == "__main__":

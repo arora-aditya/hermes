@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncEngine
 import os
-from .models import Base
+from models.base import Base
 
 
 class Database:
@@ -18,8 +18,16 @@ class Database:
         )
 
     async def init_db(self):
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        try:
+            async with self.engine.begin() as conn:
+                # Drop all tables to ensure clean state
+                await conn.run_sync(Base.metadata.drop_all)
+                # Recreate all tables
+                await conn.run_sync(Base.metadata.create_all)
+            print("Database initialized successfully")
+        except Exception as e:
+            print(f"Error initializing database: {str(e)}")
+            raise
 
     async def get_session(self) -> AsyncSession:
         async with self.async_session() as session:

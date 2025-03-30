@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from .models import Document
+from models.document import Document
 from typing import List
 from fastapi import HTTPException
 

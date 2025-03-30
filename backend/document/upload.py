@@ -2,7 +2,7 @@ from fastapi import UploadFile, File, Depends
 from pathlib import Path
 from typing import List
 from uuid import uuid4
-from .models import Document
+from models.document import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
