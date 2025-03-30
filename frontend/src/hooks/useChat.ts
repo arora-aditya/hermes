@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Message, apiService, ChatResponse } from '../services/api';
+import { Message, apiService, ChatResponse, Conversation } from '../services/api';
 
 export const useChat = (initialConversationId?: string) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(initialConversationId || null);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [isLoadingConversations, setIsLoadingConversations] = useState(false);
 
     useEffect(() => {
         // Only load initial conversation if conversationId is provided
@@ -26,6 +28,24 @@ export const useChat = (initialConversationId?: string) => {
             loadConversation();
         }
     }, [initialConversationId]);
+
+    useEffect(() => {
+        // Load conversations on mount
+        const loadConversations = async () => {
+            setIsLoadingConversations(true);
+            try {
+                const data = await apiService.getConversations();
+                setConversations(data);
+            } catch (error) {
+                console.error('Failed to fetch conversations:', error);
+                setConversations([]);
+            } finally {
+                setIsLoadingConversations(false);
+            }
+        };
+
+        loadConversations();
+    }, []);
 
     const sendMessage = async (content: string) => {
         setIsLoading(true);
@@ -66,15 +86,6 @@ export const useChat = (initialConversationId?: string) => {
         }
     };
 
-    const getConversations = async () => {
-        const response = await apiService.getConversations();
-        return response.data;
-    };
-
-    const getConversation = async (conversationId: string) => {
-        const response = await apiService.getConversation(conversationId);
-        return response;
-    };
 
     const resetConversation = () => {
         setMessages([]);
@@ -86,6 +97,8 @@ export const useChat = (initialConversationId?: string) => {
         isLoading,
         sendMessage,
         resetConversation,
-        conversationId
+        conversationId,
+        conversations,
+        isLoadingConversations
     };
 } 

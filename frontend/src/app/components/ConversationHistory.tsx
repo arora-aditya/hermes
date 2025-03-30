@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { Conversation, apiService, FileInfo } from '@/services/api';
+import { FileInfo } from '@/services/api';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useChat } from '@/hooks/useChat';
 
 interface ConversationHistoryProps {
     onSelectConversation: (conversationId: string) => void;
@@ -56,27 +57,9 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
     toggleFileSelection,
     handleIndex,
 }) => {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+    const { conversations, isLoadingConversations } = useChat();
     const [isConversationsOpen, setIsConversationsOpen] = useState(true);
     const [isFilesOpen, setIsFilesOpen] = useState(true);
-
-    useEffect(() => {
-        const fetchConversations = async () => {
-            try {
-                setIsLoadingConversations(true);
-                const data = await apiService.getConversations();
-                setConversations(Array.isArray(data) ? data : []);
-            } catch (error) {
-                console.error('Failed to fetch conversations:', error);
-                setConversations([]);
-            } finally {
-                setIsLoadingConversations(false);
-            }
-        };
-
-        fetchConversations();
-    }, []);
 
     return (
         <div className="w-64 min-w-64 border-r h-screen bg-gray-50">
