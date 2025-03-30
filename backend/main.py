@@ -34,7 +34,7 @@ app.add_middleware(
 
 @app.post("/api/uploadfiles")
 async def upload_files(files: List[UploadFile] = File(...)):
-    return document.upload_local(files)
+    return await document.upload_local(files)
 
 
 @app.get("/api/listfiles")

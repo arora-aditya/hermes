@@ -33,7 +33,7 @@ class Upload:
 
             return {"message": "Files uploaded successfully", "files": saved_files}
         except Exception as e:
-            return {"error": str(e)}, 500
+            return {"error": str(e), "status_code": 500}
 
     def list_files(self):
         try:
@@ -49,4 +49,4 @@ class Upload:
                     )
             return {"files": files}
         except Exception as e:
-            return {"error": str(e)}, 500
+            return {"error": str(e), "status_code": 500}

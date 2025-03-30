@@ -33,10 +33,10 @@ class ApiService {
 
     async uploadFile(file: File): Promise<UploadResponse> {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('files', file);
 
         const response = await axios.post<UploadResponse>(
-            `${API_BASE_URL}/upload`,
+            `${API_BASE_URL}/uploadfiles`,
             formData,
             {
                 headers: {
