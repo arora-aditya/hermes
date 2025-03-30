@@ -48,3 +48,36 @@ coverage.xml
 
 # Documentation
 docs/_build/
+
+# FastAPI specific
+backend/__pycache__/
+backend/.pytest_cache/
+backend/logs/
+
+# LangChain specific
+.langchain/
+.chainlit/
+backend/vectorstores/
+backend/embeddings/
+backend/cache/
+
+# Model files and artifacts
+*.pkl
+*.h5
+*.bin
+*.onnx
+*.pt
+*.pth
+
+# API documentation
+backend/static/redoc/
+backend/static/swagger/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
