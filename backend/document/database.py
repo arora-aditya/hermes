@@ -18,16 +18,9 @@ class Database:
         )
 
     async def init_db(self):
-        try:
-            async with self.engine.begin() as conn:
-                # Drop all tables to ensure clean state
-                await conn.run_sync(Base.metadata.drop_all)
-                # Recreate all tables
-                await conn.run_sync(Base.metadata.create_all)
-            print("Database initialized successfully")
-        except Exception as e:
-            print(f"Error initializing database: {str(e)}")
-            raise
+        # We no longer drop and recreate tables here
+        # Database migrations are now handled by Alembic
+        pass
 
     async def get_session(self) -> AsyncSession:
         async with self.async_session() as session:
