@@ -8,13 +8,11 @@ export const useChat = (initialConversationId?: string) => {
 
     useEffect(() => {
         // Only load initial conversation if conversationId is provided
-        console.log('conversationId', conversationId);
         if (conversationId) {
             const loadConversation = async () => {
                 setIsLoading(true);
                 try {
                     const conversation = await apiService.getConversation(conversationId);
-                    console.log('conversation', conversation);
                     if (conversation.messages) {
                         setMessages(conversation.messages);
                     }
