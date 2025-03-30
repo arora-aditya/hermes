@@ -17,11 +17,6 @@ class Database:
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
-    async def init_db(self):
-        # We no longer drop and recreate tables here
-        # Database migrations are now handled by Alembic
-        pass
-
     async def get_session(self) -> AsyncSession:
         async with self.async_session() as session:
             yield session

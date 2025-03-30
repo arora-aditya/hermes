@@ -21,8 +21,6 @@ db = Database()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    await db.init_db()
     yield
     # Shutdown
     pass
