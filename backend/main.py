@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi import UploadFile
 from fastapi import File
 from chat.agent import ChatRequest
+from chat.agent import ConversationRequest
 from chat.agent import Agent
 from document.ingest import IngestRequest
 from document.search import SearchRequest
@@ -76,6 +77,20 @@ async def list_files(db_session: AsyncSession = Depends(get_db)):
 @app.post("/api/chat")
 async def chat(request: ChatRequest, db_session: AsyncSession = Depends(get_db)):
     return await agent.chat(request, db_session)
+
+
+@app.get("/api/chat/conversation/{conversation_id}")
+async def chat(conversation_id: str, db_session: AsyncSession = Depends(get_db)):
+    conversation = await agent.get_conversation_messages(
+        db_session, ConversationRequest(conversation_id=conversation_id)
+    )
+    return {"messages": conversation}
+
+
+@app.get("/api/chat/conversations/{user_id}")
+async def chat(user_id: str, db_session: AsyncSession = Depends(get_db)):
+    conversations = await agent.get_conversations(db_session, user_id)
+    return {"data": conversations}
 
 
 if __name__ == "__main__":

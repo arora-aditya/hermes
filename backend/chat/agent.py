@@ -7,6 +7,10 @@ from models.conversation import Message, ConversationHistory
 from uuid import UUID
 
 
+class ConversationRequest(BaseModel):
+    conversation_id: UUID4
+
+
 class ChatRequest(BaseModel):
     message: str
     conversation_id: UUID4 | None = None
@@ -68,13 +72,20 @@ class Agent:
 
         return conversation
 
+    async def get_conversations(
+        self, db: AsyncSession, user_id: str
+    ) -> list[ConversationHistory]:
+        stmt = select(ConversationHistory).where(ConversationHistory.user_id == user_id)
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
     async def get_conversation_messages(
-        self, db: AsyncSession, conversation_id: UUID
+        self, db: AsyncSession, conversation: ConversationRequest
     ) -> list[Message]:
         # Get all messages for the conversation ordered by message_id
         stmt = (
             select(Message)
-            .where(Message.conversation_id == conversation_id)
+            .where(Message.conversation_id == conversation.conversation_id)
             .order_by(Message.message_id)
         )
         result = await db.execute(stmt)
@@ -96,7 +107,7 @@ class Agent:
 
         # Get all messages from the conversation history
         conversation_messages = await self.get_conversation_messages(
-            db, conversation.conversation_id
+            db, ConversationRequest(conversation_id=conversation.conversation_id)
         )
 
         # Prepare messages for the model

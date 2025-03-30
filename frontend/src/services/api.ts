@@ -15,6 +15,38 @@ export interface UploadResponse {
     path?: string;
 }
 
+export interface ChatRequest {
+    message: string;
+    conversation_id?: string | null;
+    user_id: string;
+}
+
+export interface ChatResponse {
+    message: string;
+    conversation_id: string;
+}
+
+export interface Message {
+    message_id: number;
+    conversation_id: string;  // UUID string
+    content: string;
+    role: 'user' | 'assistant';
+    created_at: string;
+}
+
+export interface Conversation {
+    id: number;
+    user_id: string;
+    conversation_id: string;  // UUID string
+    last_message_id: number | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ConversationResponse {
+    messages: Message[];
+}
+
 class ApiService {
     private api = axios.create({
         baseURL: API_BASE_URL,
@@ -78,6 +110,21 @@ class ApiService {
             }
         );
 
+        return response.data;
+    }
+
+    async sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+        const response = await this.api.post<ChatResponse>('/chat', request);
+        return response.data;
+    }
+
+    async getConversations(): Promise<Conversation[]> {
+        const response = await this.api.get<Conversation[]>('/chat/conversations/2');
+        return response.data;
+    }
+
+    async getConversation(conversationId: string): Promise<ConversationResponse> {
+        const response = await this.api.get<ConversationResponse>(`/chat/conversation/${conversationId}`);
         return response.data;
     }
 }

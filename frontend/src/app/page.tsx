@@ -5,40 +5,17 @@ import { FileUploadModal } from './components/FileUploadModal';
 import { useFiles } from '@/hooks/useFiles';
 import { ChatHistory } from './components/ChatHistory';
 import { ChatInput } from './components/ChatInput';
-import { useState } from 'react';
-
-interface Message {
-  content: string;
-  role: 'user' | 'assistant';
-}
+import { useChat } from '@/hooks/useChat';
+import { useEffect } from 'react';
 
 export default function Home() {
   const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { messages, isLoading, sendMessage, resetConversation } = useChat('34f76c29-cf93-472f-8259-7fd2fd58db7d');
 
-  const handleSendMessage = async (content: string) => {
-    // Add user message immediately
-    const userMessage: Message = { content, role: 'user' };
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
-      // TODO: Implement actual API call to backend
-      // For now, just simulate a response
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          content: "This is a simulated response. Backend integration pending.",
-          role: 'assistant'
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setIsLoading(false);
-    }
-  };
+  // Reset conversation on first load
+  useEffect(() => {
+    resetConversation();
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -55,7 +32,7 @@ export default function Home() {
         </div>
         <div className="flex-1 flex flex-col">
           <ChatHistory messages={messages} />
-          <ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
+          <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
         </div>
       </div>
     </div>
