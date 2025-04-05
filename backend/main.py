@@ -1,5 +1,5 @@
 from load_env import IS_ENV_LOADED
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from chat.agent import ChatRequest
 from chat.agent import Agent
 from chat.conversation import ConversationService
@@ -11,43 +11,100 @@ from uuid import UUID
 from controller import users, organizations, documents
 from utils.database import get_db
 from models.relationships import setup_relationships
+from utils.logging_config import setup_logging
+import logging
+import time
 import uvicorn
+
+# Set up logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not IS_ENV_LOADED:
-        raise Exception("Environment variables not loaded")
+    """Lifecycle manager for the FastAPI application."""
+    try:
+        if not IS_ENV_LOADED:
+            logger.error("Environment variables not loaded")
+            raise Exception("Environment variables not loaded")
 
-    # Set up SQLAlchemy relationships
-    setup_relationships()
+        logger.info("Starting application initialization")
 
-    yield
-    # Shutdown
-    pass
+        # Set up SQLAlchemy relationships
+        setup_relationships()
+        logger.info("Database relationships configured")
+
+        logger.info("Application startup complete")
+        yield
+
+        # Shutdown
+        logger.info("Application shutdown initiated")
+    except Exception as e:
+        logger.error(f"Error during application lifecycle: {str(e)}", exc_info=True)
+        raise
 
 
-app = FastAPI(lifespan=lifespan)
-agent = Agent()
+# Initialize FastAPI app
+app = FastAPI(
+    title="Hermes API",
+    description="Document processing and search API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
+# Add middleware for request logging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log incoming requests and their processing time."""
+    start_time = time.time()
+
+    # Generate request ID
+    request_id = str(time.time())
+    logger.info(
+        f"Request started - ID: {request_id} - Method: {request.method} - URL: {request.url}"
+    )
+
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start_time) * 1000
+        logger.info(
+            f"Request completed - ID: {request_id} - Status: {response.status_code} - Duration: {process_time:.2f}ms"
+        )
+        return response
+    except Exception as e:
+        logger.error(
+            f"Request failed - ID: {request_id} - Error: {str(e)}", exc_info=True
+        )
+        raise
+
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Add your frontend URL
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers with /api prefix
+# Include routers
+logger.debug("Registering API routes")
 app.include_router(users.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
 app.include_router(documents.router)  # Documents router already has /api prefix
+logger.debug("API routes registered successfully")
 
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    """Health check endpoint."""
+    logger.debug("Health check request received")
+    return {"status": "healthy", "service": "Hermes API"}
+
+
+agent = Agent()
 
 
 @app.post("/api/chat")
@@ -85,4 +142,5 @@ async def delete_conversation(
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    logger.info("Starting Hermes API server")
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

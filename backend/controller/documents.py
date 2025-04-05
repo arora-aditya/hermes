@@ -15,6 +15,12 @@ import shutil
 from langchain_community.document_loaders import PyPDFLoader
 import logging
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
@@ -53,12 +59,17 @@ async def upload_documents(
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        logger.info(
+            f"Starting document upload for user_id={user_id}, files={[f.filename for f in files]}"
+        )
         saved_files = []
         for file in files:
+            logger.debug(f"Processing file: {file.filename}")
             # Save file to disk
             file_path = UPLOAD_DIR / file.filename
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
+            logger.debug(f"File saved to disk: {file_path}")
 
             # Create document record
             doc = Document(
@@ -69,11 +80,15 @@ async def upload_documents(
             db.add(doc)
             await db.commit()
             await db.refresh(doc)
+            logger.debug(f"Document record created: id={doc.id}")
 
             # Create user-document mapping
             user_doc = UserDocument(user_id=user_id, document_id=doc.id)
             db.add(user_doc)
             await db.commit()
+            logger.debug(
+                f"User-document mapping created: user_id={user_id}, document_id={doc.id}"
+            )
 
             saved_files.append(
                 DocumentResponse.model_validate(
@@ -91,9 +106,16 @@ async def upload_documents(
                 )
             )
 
+        logger.info(
+            f"Successfully uploaded {len(saved_files)} files for user_id={user_id}"
+        )
         return saved_files
 
     except Exception as e:
+        logger.error(
+            f"Error during document upload for user_id={user_id}: {str(e)}",
+            exc_info=True,
+        )
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -233,10 +255,16 @@ async def ingest_documents(
     request: IngestRequest, user_id: int, db: AsyncSession = Depends(get_db)
 ):
     try:
+        logger.info(
+            f"Starting document ingestion for user_id={user_id}, document_ids={request.document_ids}"
+        )
         all_docs = []
 
         # Verify all documents exist and belong to user
         for doc_id in request.document_ids:
+            logger.debug(
+                f"Verifying document access: doc_id={doc_id}, user_id={user_id}"
+            )
             query = (
                 select(Document)
                 .distinct()
@@ -248,41 +276,61 @@ async def ingest_documents(
             document = result.unique().scalar_one_or_none()
 
             if not document:
+                logger.warning(
+                    f"Document not found or not accessible: doc_id={doc_id}, user_id={user_id}"
+                )
                 raise HTTPException(
                     status_code=404,
                     detail=f"Document with id {doc_id} not found or not accessible",
                 )
             all_docs.append(document)
+            logger.debug(f"Document verified: doc_id={doc_id}")
 
         # Process all documents
         processed_docs = []
         for document in all_docs:
             try:
+                logger.debug(
+                    f"Processing document: id={document.id}, filename={document.filename}"
+                )
                 loader = PyPDFLoader(document.file_path)
                 pages = loader.load()
-                # Add document_id to each page's metadata as an integer
+                logger.debug(f"Document loaded: id={document.id}, pages={len(pages)}")
+
+                # Add document_id to each page's metadata
                 for page in pages:
-                    page.metadata["document_id"] = (
-                        document.id
-                    )  # Store as integer, not string
+                    page.metadata["document_id"] = document.id
+                    logger.debug(
+                        f"Added metadata to page: doc_id={document.id}, page_number={page.metadata.get('page', 'unknown')}"
+                    )
                 processed_docs.extend(pages)
 
                 # Update document status
                 document.is_ingested = True
                 await db.commit()
+                logger.debug(f"Document marked as ingested: id={document.id}")
             except Exception as e:
-                # Log specific document processing error but continue with others
-                logging.error(f"Error processing document {document.id}: {str(e)}")
+                logger.error(
+                    f"Error processing document {document.id}: {str(e)}", exc_info=True
+                )
                 continue
 
         if not processed_docs:
+            logger.error("No documents could be processed successfully")
             raise HTTPException(
                 status_code=422, detail="No documents could be processed successfully"
             )
 
         # Process documents through chunking and embedding pipeline
+        logger.info(f"Starting chunking process for {len(processed_docs)} pages")
         chunks = chunk_service.chunk_docs(processed_docs)
+        logger.info(f"Chunking complete. Created {len(chunks)} chunks")
+
+        logger.info("Starting embedding process")
         embeddings = embeddings_service.embed_docs(chunks)
+        logger.info(
+            f"Embedding complete. Created {len(embeddings) if isinstance(embeddings, list) else 1} embeddings"
+        )
 
         return {
             "message": "Documents ingested successfully",
@@ -294,10 +342,13 @@ async def ingest_documents(
         }
 
     except HTTPException:
+        logger.error("HTTP exception during ingestion", exc_info=True)
         await db.rollback()
         raise
     except Exception as e:
-        print(e)
+        logger.error(
+            f"Unexpected error during document ingestion: {str(e)}", exc_info=True
+        )
         await db.rollback()
         raise HTTPException(
             status_code=500, detail=f"Error during document ingestion: {str(e)}"
@@ -309,11 +360,13 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
     try:
         # Input validation
         if not request.query.strip():
+            logger.warning(
+                f"Empty search query received from user_id={request.user_id}"
+            )
             raise HTTPException(status_code=422, detail="Search query cannot be empty")
 
-        # Log search request
-        logging.info(
-            f"Search request received - query: {request.query}, user_id: {request.user_id}"
+        logger.info(
+            f"Search request received - query='{request.query}', user_id={request.user_id}"
         )
 
         # First verify if user has any documents
@@ -326,45 +379,53 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
         user_doc_ids = [r[0] for r in result.all()]
 
         if not user_doc_ids:
-            logging.warning(f"User {request.user_id} has no documents")
+            logger.warning(f"User {request.user_id} has no documents")
             return {
                 "documents": [],
                 "total": 0,
                 "message": "No documents found for this user",
             }
 
-        logging.info(f"User {request.user_id} has documents: {user_doc_ids}")
+        logger.debug(f"User {request.user_id} has access to documents: {user_doc_ids}")
 
         # Perform similarity search
         try:
+            logger.debug(f"Performing similarity search with query: '{request.query}'")
             search_results = search_service.search(request.query)
-            logging.info(
+            logger.info(
                 f"Search returned {len(search_results) if search_results else 0} results"
             )
+
+            # Log the first few results for debugging
+            if search_results:
+                for i, result in enumerate(search_results[:3]):
+                    logger.debug(
+                        f"Search result {i+1}: doc_id={result.metadata.get('document_id')}, score={result.metadata.get('score', 'N/A')}"
+                    )
         except Exception as e:
-            logging.error(f"Error performing similarity search: {str(e)}")
+            logger.error(f"Error performing similarity search: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, detail=f"Error performing similarity search: {str(e)}"
             )
 
-        # Extract document IDs from search results and ensure they are integers
+        # Extract document IDs from search results
         document_ids = []
         for result in search_results:
             if result.metadata and "document_id" in result.metadata:
                 doc_id = result.metadata["document_id"]
-                # Convert to int if it's not already
                 if isinstance(doc_id, str):
                     try:
                         doc_id = int(doc_id)
+                        logger.debug(f"Converted string doc_id to int: {doc_id}")
                     except ValueError:
-                        logging.warning(f"Invalid document_id in metadata: {doc_id}")
+                        logger.warning(f"Invalid document_id in metadata: {doc_id}")
                         continue
                 document_ids.append(doc_id)
 
-        logging.info(f"Found document IDs in search results: {document_ids}")
+        logger.debug(f"Extracted document IDs from search results: {document_ids}")
 
         if not document_ids:
-            logging.warning("No document IDs found in search results")
+            logger.warning("No valid document IDs found in search results")
             return {
                 "documents": [],
                 "total": 0,
@@ -382,7 +443,10 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
         result = await db.execute(query)
         accessible_documents = result.unique().scalars().all()
 
-        logging.info(f"Found {len(accessible_documents)} accessible documents for user")
+        logger.info(f"Found {len(accessible_documents)} accessible documents for user")
+        logger.debug(
+            f"Accessible document IDs: {[doc.id for doc in accessible_documents]}"
+        )
 
         return {
             "documents": [
@@ -407,7 +471,9 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"Unexpected error during document search: {str(e)}")
+        logger.error(
+            f"Unexpected error during document search: {str(e)}", exc_info=True
+        )
         raise HTTPException(
             status_code=500, detail=f"Error during document search: {str(e)}"
         )
