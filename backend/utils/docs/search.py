@@ -1,8 +1,6 @@
-from langchain_openai import OpenAIEmbeddings
-from langchain_postgres import PGVector
 from pydantic import BaseModel
-import os
 import logging
+from utils.vector_store import get_vector_store
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -15,53 +13,27 @@ class SearchRequest(BaseModel):
 
 class Search:
     def __init__(self):
+        """Initialize the search service with PGVector."""
         try:
             logger.info("Initializing Search service")
-            self.embeddings = OpenAIEmbeddings(
-                api_key=os.environ["OPENAI_API_KEY"],
-                model=os.environ.get(
-                    "OPENAI_TEXT_EMBEDDING_MODEL", "text-embedding-3-small"
-                ),
-            )
-            logger.debug("OpenAI embeddings initialized")
-
-            connection_string = os.environ["DATABASE_URL"]
-            logger.info(f"Initializing PGVector with connection: {connection_string}")
-
-            self.pgvector = PGVector(
-                embeddings=self.embeddings,
-                collection_name="my_docs",
-                connection=connection_string,
-                use_jsonb=True,
-            )
-            logger.debug("PGVector initialized successfully")
-
-            # Verify collection exists
-            self.verify_collection()
-            logger.info("Search service initialization complete")
+            self.pgvector = get_vector_store()
+            logger.info("Search service initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing Search service: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to initialize Search service: {str(e)}", exc_info=True
+            )
             raise
 
-    def verify_collection(self):
-        try:
-            # Try a simple search to verify the collection exists and is accessible
-            logger.debug("Verifying collection existence and accessibility")
-            results = self.pgvector.similarity_search_with_score("test query", k=1)
-            logger.info(
-                f"Collection verification successful. Found {len(results)} results."
-            )
-
-            # Log some details about the first result if available
-            if results:
-                result, score = results[0]
-                logger.debug(f"Sample result metadata: {result.metadata}")
-                logger.debug(f"Sample result score: {score}")
-        except Exception as e:
-            logger.warning(f"Collection verification failed: {str(e)}")
-            logger.info("Collection will be created when documents are first embedded")
-
     def search(self, query: str):
+        """
+        Perform similarity search using the vector store.
+
+        Args:
+            query: Search query string
+
+        Returns:
+            List of matching documents with similarity scores
+        """
         try:
             logger.info(f"Performing similarity search with query: '{query}'")
 

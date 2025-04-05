@@ -1,7 +1,8 @@
-from langchain_openai import OpenAIEmbeddings
-from langchain_postgres import PGVector
 from pydantic import BaseModel
-import os
+import logging
+from utils.vector_store import get_vector_store
+
+logger = logging.getLogger(__name__)
 
 
 class SearchRequest(BaseModel):
@@ -10,20 +11,32 @@ class SearchRequest(BaseModel):
 
 class Search:
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(
-            api_key=os.environ["OPENAI_API_KEY"],
-            model=os.environ.get(
-                "OPENAI_TEXT_EMBEDDING_MODEL", "text-embedding-3-small"
-            ),
-        )
-        self.connection = f"postgresql+psycopg://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
-        self.pgvector = PGVector(
-            embeddings=self.embeddings,
-            collection_name="my_docs",
-            connection=self.connection,
-            use_jsonb=True,
-        )
-        print(self.connection)
+        """Initialize the search service with PGVector."""
+        try:
+            logger.info("Initializing Search service")
+            self.pgvector = get_vector_store()
+            logger.info("Search service initialized successfully")
+        except Exception as e:
+            logger.error(
+                f"Failed to initialize Search service: {str(e)}", exc_info=True
+            )
+            raise
 
-    def search(self, query: SearchRequest):
-        return self.pgvector.similarity_search(query.query)
+    def search(self, query: str):
+        """
+        Perform similarity search using the vector store.
+
+        Args:
+            query: Search query string
+
+        Returns:
+            List of matching documents with similarity scores
+        """
+        try:
+            logger.info(f"Performing similarity search with query: '{query}'")
+            results = self.pgvector.similarity_search(query)
+            logger.info(f"Search completed. Found {len(results)} results")
+            return results
+        except Exception as e:
+            logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
+            raise

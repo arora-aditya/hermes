@@ -6,47 +6,18 @@ from langchain_postgres import PGVector
 from uuid import uuid4
 from utils.database import Database
 import logging
+from utils.vector_store import get_vector_store
 
 logger = logging.getLogger(__name__)
 
 
 class Embeddings:
     def __init__(self):
-        """Initialize the embeddings service with OpenAI and PGVector."""
+        """Initialize the embeddings service with PGVector."""
         try:
             logger.info("Initializing Embeddings service")
-
-            # Initialize OpenAI embeddings
-            api_key = os.environ.get("OPENAI_API_KEY")
-            model = os.environ.get(
-                "OPENAI_TEXT_EMBEDDING_MODEL", "text-embedding-3-small"
-            )
-
-            if not api_key:
-                logger.error("OpenAI API key not found in environment variables")
-                raise ValueError("OpenAI API key not configured")
-
-            logger.debug(f"Initializing OpenAI embeddings with model: {model}")
-            self.embeddings = OpenAIEmbeddings(
-                api_key=api_key,
-                model=model,
-            )
-
-            # Initialize database connection
-            logger.debug("Initializing database connection")
-            self.db = Database()
-
-            # Initialize PGVector
-            logger.debug("Initializing PGVector")
-            self.pgvector = PGVector(
-                embeddings=self.embeddings,
-                collection_name="my_docs",
-                connection=self.db.get_db_url(),
-                use_jsonb=True,
-            )
-
+            self.pgvector = get_vector_store()
             logger.info("Embeddings service initialized successfully")
-
         except Exception as e:
             logger.error(
                 f"Failed to initialize Embeddings service: {str(e)}", exc_info=True
