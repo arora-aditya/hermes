@@ -23,6 +23,7 @@ class Search:
             connection=self.connection,
             use_jsonb=True,
         )
+        print(self.connection)
 
     def search(self, query: SearchRequest):
         return self.pgvector.similarity_search(query.query)

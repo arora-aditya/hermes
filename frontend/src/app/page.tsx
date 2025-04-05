@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { ConversationHistory } from './components/ConversationHistory';
 
 export default function Home() {
-  const userId = 1;
+  const userId = 2;
   const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles(userId);
   const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat(userId);
 

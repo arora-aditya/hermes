@@ -1,8 +1,8 @@
-"""create_user_documents_table
+"""create_documents_table
 
-Revision ID: 082d6354a219
-Revises: 6dbf960e2f38
-Create Date: 2025-03-30 18:16:02.045432
+Revision ID: 6dbf960e2f38
+Revises: 528d51a50dc4
+Create Date: 2025-04-05 22:06:02.045432
 
 """
 
@@ -13,19 +13,20 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "082d6354a219"
-down_revision: Union[str, None] = "6dbf960e2f38"
+revision: str = "6dbf960e2f38"
+down_revision: Union[str, None] = "528d51a50dc4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create user_documents table."""
+    """Create documents table."""
     op.create_table(
-        "user_documents",
+        "documents",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("document_id", sa.Integer(), nullable=False),
+        sa.Column("filename", sa.String(), nullable=False),
+        sa.Column("file_path", sa.String(), nullable=False),
+        sa.Column("is_ingested", sa.Boolean(), server_default="false", nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -33,18 +34,10 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-        ),
-        sa.ForeignKeyConstraint(
-            ["document_id"],
-            ["documents.id"],
-        ),
         sa.PrimaryKeyConstraint("id"),
     )
 
 
 def downgrade() -> None:
-    """Drop user_documents table."""
-    op.drop_table("user_documents")
+    """Drop documents table."""
+    op.drop_table("documents")

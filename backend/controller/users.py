@@ -22,11 +22,22 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
 
+    # Check if email already exists
+    email_stmt = select(User).where(User.email == user.email)
+    email_result = await db.execute(email_stmt)
+    existing_user = email_result.scalar_one_or_none()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email already exists",
+        )
+
     try:
         db_user = User(
             first_name=user.first_name,
             last_name=user.last_name,
             organization_id=user.organization_id,
+            email=user.email,
         )
         db.add(db_user)
         await db.commit()
@@ -90,6 +101,17 @@ async def update_user(
         if not organization:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            )
+
+    # If email is being updated, check if it already exists
+    if user.email is not None and user.email != db_user.email:
+        email_stmt = select(User).where(User.email == user.email)
+        email_result = await db.execute(email_stmt)
+        existing_user = email_result.scalar_one_or_none()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists",
             )
 
     try:
