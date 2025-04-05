@@ -25,4 +25,4 @@ class Embeddings:
 
     def embed_docs(self, docs: List[Document]):
         document_ids = self.pgvector.add_documents(docs)
-        return [document_ids]
+        return document_ids

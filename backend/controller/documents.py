@@ -13,6 +13,7 @@ from utils.docs.search import Search
 import os
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
+import logging
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -259,6 +260,11 @@ async def ingest_documents(
             try:
                 loader = PyPDFLoader(document.file_path)
                 pages = loader.load()
+                # Add document_id to each page's metadata as an integer
+                for page in pages:
+                    page.metadata["document_id"] = (
+                        document.id
+                    )  # Store as integer, not string
                 processed_docs.extend(pages)
 
                 # Update document status
@@ -266,7 +272,7 @@ async def ingest_documents(
                 await db.commit()
             except Exception as e:
                 # Log specific document processing error but continue with others
-                print(f"Error processing document {document.id}: {str(e)}")
+                logging.error(f"Error processing document {document.id}: {str(e)}")
                 continue
 
         if not processed_docs:
@@ -305,22 +311,60 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
         if not request.query.strip():
             raise HTTPException(status_code=422, detail="Search query cannot be empty")
 
+        # Log search request
+        logging.info(
+            f"Search request received - query: {request.query}, user_id: {request.user_id}"
+        )
+
+        # First verify if user has any documents
+        user_docs_query = (
+            select(Document.id)
+            .join(UserDocument)
+            .where(UserDocument.user_id == request.user_id)
+        )
+        result = await db.execute(user_docs_query)
+        user_doc_ids = [r[0] for r in result.all()]
+
+        if not user_doc_ids:
+            logging.warning(f"User {request.user_id} has no documents")
+            return {
+                "documents": [],
+                "total": 0,
+                "message": "No documents found for this user",
+            }
+
+        logging.info(f"User {request.user_id} has documents: {user_doc_ids}")
+
         # Perform similarity search
         try:
             search_results = search_service.search(request.query)
+            logging.info(
+                f"Search returned {len(search_results) if search_results else 0} results"
+            )
         except Exception as e:
+            logging.error(f"Error performing similarity search: {str(e)}")
             raise HTTPException(
                 status_code=500, detail=f"Error performing similarity search: {str(e)}"
             )
 
-        # Extract document IDs from search results
-        document_ids = [
-            result.metadata.get("document_id")
-            for result in search_results
-            if result.metadata.get("document_id")
-        ]
+        # Extract document IDs from search results and ensure they are integers
+        document_ids = []
+        for result in search_results:
+            if result.metadata and "document_id" in result.metadata:
+                doc_id = result.metadata["document_id"]
+                # Convert to int if it's not already
+                if isinstance(doc_id, str):
+                    try:
+                        doc_id = int(doc_id)
+                    except ValueError:
+                        logging.warning(f"Invalid document_id in metadata: {doc_id}")
+                        continue
+                document_ids.append(doc_id)
+
+        logging.info(f"Found document IDs in search results: {document_ids}")
 
         if not document_ids:
+            logging.warning("No document IDs found in search results")
             return {
                 "documents": [],
                 "total": 0,
@@ -337,6 +381,8 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
         )
         result = await db.execute(query)
         accessible_documents = result.unique().scalars().all()
+
+        logging.info(f"Found {len(accessible_documents)} accessible documents for user")
 
         return {
             "documents": [
@@ -361,6 +407,7 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
     except HTTPException:
         raise
     except Exception as e:
+        logging.error(f"Unexpected error during document search: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error during document search: {str(e)}"
         )
