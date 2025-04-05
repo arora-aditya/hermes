@@ -39,23 +39,32 @@ class Search:
 
             # Log the query embedding process
             logger.debug("Generating query embeddings")
-            results = self.pgvector.similarity_search(query)
+            results = self.pgvector.similarity_search_with_score(query)
+
+            # Convert results to documents with scores in metadata
+            documents_with_scores = []
+            for doc, score in results:
+                doc.metadata["score"] = score
+                documents_with_scores.append(doc)
 
             # Log search results details
-            logger.info(f"Search completed. Found {len(results)} results")
-            if results:
+            logger.info(f"Search completed. Found {len(documents_with_scores)} results")
+            if documents_with_scores:
                 logger.debug("Top results metadata:")
-                for i, result in enumerate(results[:3]):  # Log first 3 results
+                for i, doc in enumerate(
+                    documents_with_scores[:3]
+                ):  # Log first 3 results
                     logger.debug(f"Result {i+1}:")
                     logger.debug(
-                        f"  Document ID: {result.metadata.get('document_id', 'N/A')}"
+                        f"  Document ID: {doc.metadata.get('document_id', 'N/A')}"
                     )
-                    logger.debug(f"  Page: {result.metadata.get('page', 'N/A')}")
-                    logger.debug(f"  Content preview: {result.page_content[:100]}...")
+                    logger.debug(f"  Score: {doc.metadata.get('score', 'N/A')}")
+                    logger.debug(f"  Page: {doc.metadata.get('page', 'N/A')}")
+                    logger.debug(f"  Content preview: {doc.page_content[:100]}...")
             else:
                 logger.warning("Search returned no results")
 
-            return results
+            return documents_with_scores
         except Exception as e:
             logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
             raise

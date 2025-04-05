@@ -33,9 +33,23 @@ class DocumentResponse(BaseModel):
     updated_at: Optional[str]
 
 
+class ChunkResponse(BaseModel):
+    content: str
+    score: float
+    page_number: Optional[int]
+    chunk_index: Optional[int]
+
+
+class DocumentWithChunksResponse(DocumentResponse):
+    chunks: List[ChunkResponse] = []
+
+
 class SearchRequest(BaseModel):
     query: str
     user_id: int
+    chunks_per_document: Optional[int] = 50
+    min_score: Optional[float] = 0.7
+    sort_by_score: Optional[bool] = True
 
 
 class IngestRequest(BaseModel):
@@ -395,44 +409,79 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
             logger.info(
                 f"Search returned {len(search_results) if search_results else 0} results"
             )
-
-            # Log the first few results for debugging
-            if search_results:
-                for i, result in enumerate(search_results[:3]):
-                    logger.debug(
-                        f"Search result {i+1}: doc_id={result.metadata.get('document_id')}, score={result.metadata.get('score', 'N/A')}"
-                    )
         except Exception as e:
             logger.error(f"Error performing similarity search: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, detail=f"Error performing similarity search: {str(e)}"
             )
 
-        # Extract document IDs from search results
-        document_ids = []
+        # Group results by document and filter by score
+        document_chunks = {}
+        all_chunks = []  # Store all chunks for global sorting
         for result in search_results:
-            if result.metadata and "document_id" in result.metadata:
-                doc_id = result.metadata["document_id"]
-                if isinstance(doc_id, str):
-                    try:
-                        doc_id = int(doc_id)
-                        logger.debug(f"Converted string doc_id to int: {doc_id}")
-                    except ValueError:
-                        logger.warning(f"Invalid document_id in metadata: {doc_id}")
-                        continue
-                document_ids.append(doc_id)
+            if not result.metadata or "document_id" not in result.metadata:
+                continue
 
-        logger.debug(f"Extracted document IDs from search results: {document_ids}")
+            score = result.metadata.get("score", 0)
+            if score < request.min_score:
+                continue
 
+            doc_id = result.metadata["document_id"]
+            if isinstance(doc_id, str):
+                try:
+                    doc_id = int(doc_id)
+                except ValueError:
+                    continue
+
+            if doc_id not in document_chunks:
+                document_chunks[doc_id] = []
+
+            chunk_response = ChunkResponse(
+                content=result.page_content,
+                score=score,
+                page_number=result.metadata.get("page"),
+                chunk_index=result.metadata.get("chunk_index"),
+            )
+
+            document_chunks[doc_id].append(chunk_response)
+            all_chunks.append((doc_id, chunk_response))
+
+        # Sort all chunks by score if requested
+        if request.sort_by_score:
+            all_chunks.sort(key=lambda x: x[1].score, reverse=True)
+
+            # Rebuild document_chunks with sorted chunks
+            document_chunks = {}
+            for doc_id, chunk in all_chunks:
+                if doc_id not in document_chunks:
+                    document_chunks[doc_id] = []
+                if len(document_chunks[doc_id]) < request.chunks_per_document:
+                    document_chunks[doc_id].append(chunk)
+        else:
+            # Sort chunks within each document and apply limit
+            for doc_id in document_chunks:
+                if request.sort_by_score:
+                    # Sort by score within document
+                    document_chunks[doc_id].sort(key=lambda x: x.score, reverse=True)
+                else:
+                    # Sort by page number and chunk index to maintain document flow
+                    document_chunks[doc_id].sort(
+                        key=lambda x: (x.page_number or 0, x.chunk_index or 0)
+                    )
+                if request.chunks_per_document:
+                    document_chunks[doc_id] = document_chunks[doc_id][
+                        : request.chunks_per_document
+                    ]
+
+        # Get document metadata for documents with matching chunks
+        document_ids = list(document_chunks.keys())
         if not document_ids:
-            logger.warning("No valid document IDs found in search results")
             return {
                 "documents": [],
                 "total": 0,
-                "message": "No matching documents found",
+                "message": "No matching chunks found above score threshold",
             }
 
-        # Filter results to only include documents the user has access to
         query = (
             select(Document)
             .distinct()
@@ -443,29 +492,29 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
         result = await db.execute(query)
         accessible_documents = result.unique().scalars().all()
 
-        logger.info(f"Found {len(accessible_documents)} accessible documents for user")
-        logger.debug(
-            f"Accessible document IDs: {[doc.id for doc in accessible_documents]}"
-        )
+        # Prepare response with documents and their chunks
+        response_documents = []
+        for doc in accessible_documents:
+            doc_response = DocumentWithChunksResponse(
+                id=doc.id,
+                filename=doc.filename,
+                is_ingested=doc.is_ingested,
+                created_at=doc.created_at.isoformat() if doc.created_at else None,
+                updated_at=doc.updated_at.isoformat() if doc.updated_at else None,
+                chunks=document_chunks.get(doc.id, []),
+            )
+            response_documents.append(doc_response)
+
+        # Sort documents by their highest scoring chunk
+        if request.sort_by_score:
+            response_documents.sort(
+                key=lambda x: max((c.score for c in x.chunks), default=0), reverse=True
+            )
 
         return {
-            "documents": [
-                DocumentResponse.model_validate(
-                    {
-                        "id": doc.id,
-                        "filename": doc.filename,
-                        "is_ingested": doc.is_ingested,
-                        "created_at": (
-                            doc.created_at.isoformat() if doc.created_at else None
-                        ),
-                        "updated_at": (
-                            doc.updated_at.isoformat() if doc.updated_at else None
-                        ),
-                    }
-                )
-                for doc in accessible_documents
-            ],
-            "total": len(accessible_documents),
+            "documents": response_documents,
+            "total": len(response_documents),
+            "total_chunks": sum(len(doc.chunks) for doc in response_documents),
         }
 
     except HTTPException:
