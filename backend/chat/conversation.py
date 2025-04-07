@@ -5,6 +5,23 @@ from models.conversation import Message, ConversationHistory
 from uuid import UUID
 from fastapi import HTTPException
 from typing import List, Dict
+from controller.documents import search_documents, SearchRequest
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: UUID4 | None = None
+    user_id: str
+
+
+class ChatResponse(BaseModel):
+    message: str
+    conversation_id: UUID4
 
 
 class ConversationService:
@@ -116,22 +133,26 @@ class ConversationService:
 
     @staticmethod
     async def prepare_messages_for_llm(
-        db: AsyncSession, conversation_id: UUID, system_prompt: Dict[str, str]
+        db: AsyncSession, request: ChatRequest, system_prompt: Dict[str, str]
     ) -> List[Dict[str, str]]:
-        """Prepare messages for LLM including system prompt and conversation history."""
+        """Prepare messages for LLM including system prompt, relevant document context, and conversation history."""
         # Get conversation history
         conversation_messages = await ConversationService.get_conversation_messages(
-            db, conversation_id
+            db, request.conversation_id
         )
 
         # Prepare messages for the model
         messages = [system_prompt]  # Start with system prompt
+
+        # Add conversation history
         messages.extend(
             [
                 {"role": msg.role, "content": msg.content}
                 for msg in conversation_messages
             ]
         )
+
+        messages.append({"role": "user", "content": request.message})
 
         return messages
 
