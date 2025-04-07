@@ -48,14 +48,21 @@ class Chunk:
                 f"Average chunk size: {sum(len(c.page_content) for c in chunks) / len(chunks):.0f} characters"
             )
 
-            # Ensure each chunk preserves the document_id from its parent document
+            # Ensure each chunk preserves both document_id and user_id from its parent document
             for i, chunk in enumerate(chunks):
                 if hasattr(chunk, "metadata"):
                     parent_metadata = chunk.metadata
+                    # Preserve document_id
                     if "document_id" in parent_metadata:
                         chunk.metadata["document_id"] = parent_metadata["document_id"]
                         logger.debug(
                             f"Chunk {i+1}: Preserved document_id={parent_metadata['document_id']}"
+                        )
+                    # Preserve user_id
+                    if "user_id" in parent_metadata:
+                        chunk.metadata["user_id"] = parent_metadata["user_id"]
+                        logger.debug(
+                            f"Chunk {i+1}: Preserved user_id={parent_metadata['user_id']}"
                         )
 
             return chunks

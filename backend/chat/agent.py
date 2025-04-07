@@ -1,11 +1,9 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, UUID4
 import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.conversation import Message, ConversationHistory
 from uuid import UUID
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import AIMessage
 from chat.conversation import ConversationService
 from chat.conversation import ChatRequest, ChatResponse
@@ -13,23 +11,12 @@ from langchain_core.tools import Tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from chat.tools import create_search_documents_tool
 from langchain.prompts import ChatPromptTemplate
+from utils.llm import get_gemini_llm
 
 
 class Agent:
     def __init__(self):
-        if os.environ.get("USE_REAL_LLM", "true") == "true":
-            self.llm = ChatGoogleGenerativeAI(
-                model=os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp"),
-                temperature=0,
-                max_tokens=None,
-                timeout=None,
-                max_retries=2,
-                api_key=os.environ.get("GEMINI_API_KEY"),
-            )
-        else:
-            self.llm = FakeListChatModel(
-                responses=["This is a test response from the fake chat model."]
-            )
+        self.llm = get_gemini_llm()
 
         self.system_prompt = ChatPromptTemplate.from_messages(
             [

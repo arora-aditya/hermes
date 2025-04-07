@@ -42,7 +42,8 @@ class Embeddings:
                 logger.debug(
                     f"Document {i+1}: "
                     f"metadata={doc.metadata}, "
-                    f"content_length={len(doc.page_content)}"
+                    f"content_length={len(doc.page_content)}, "
+                    f"user_id={doc.metadata.get('user_id', 'not_set')}"
                 )
 
             # Add documents to vector store

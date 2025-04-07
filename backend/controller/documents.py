@@ -314,8 +314,9 @@ async def ingest_documents(
                 # Add document_id to each page's metadata
                 for page in pages:
                     page.metadata["document_id"] = document.id
+                    page.metadata["user_id"] = user_id  # Add user_id to metadata
                     logger.debug(
-                        f"Added metadata to page: doc_id={document.id}, page_number={page.metadata.get('page', 'unknown')}"
+                        f"Added metadata to page: doc_id={document.id}, user_id={user_id}, page_number={page.metadata.get('page', 'unknown')}"
                     )
                 processed_docs.extend(pages)
 
@@ -402,31 +403,30 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
 
         logger.debug(f"User {request.user_id} has access to documents: {user_doc_ids}")
 
-        # Perform similarity search
+        # Perform multi-query search with user filtering
         try:
-            logger.debug(f"Performing similarity search with query: '{request.query}'")
-            search_results = search_service.search(request.query)
+            logger.debug(f"Performing multi-query search with query: '{request.query}'")
+            search_results = search_service.search(
+                query=request.query,
+                user_id=request.user_id,
+                limit=request.chunks_per_document,
+            )
             logger.info(
                 f"Search returned {len(search_results) if search_results else 0} results"
             )
         except Exception as e:
-            logger.error(f"Error performing similarity search: {str(e)}", exc_info=True)
+            logger.error(f"Error performing search: {str(e)}", exc_info=True)
             raise HTTPException(
-                status_code=500, detail=f"Error performing similarity search: {str(e)}"
+                status_code=500, detail=f"Error performing search: {str(e)}"
             )
 
-        # Group results by document and filter by score
+        # Group results by document
         document_chunks = {}
-        all_chunks = []  # Store all chunks for global sorting
-        for result in search_results:
-            if not result.metadata or "document_id" not in result.metadata:
+        for doc in search_results:
+            if not doc.metadata or "document_id" not in doc.metadata:
                 continue
 
-            score = result.metadata.get("score", 0)
-            if score < request.min_score:
-                continue
-
-            doc_id = result.metadata["document_id"]
+            doc_id = doc.metadata["document_id"]
             if isinstance(doc_id, str):
                 try:
                     doc_id = int(doc_id)
@@ -436,42 +436,14 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
             if doc_id not in document_chunks:
                 document_chunks[doc_id] = []
 
+            # Create chunk response
             chunk_response = ChunkResponse(
-                content=result.page_content,
-                score=score,
-                page_number=result.metadata.get("page"),
-                chunk_index=result.metadata.get("chunk_index"),
+                content=doc.page_content,
+                score=doc.metadata.get("score", 0.0),
+                page_number=doc.metadata.get("page"),
+                chunk_index=doc.metadata.get("chunk_index"),
             )
-
             document_chunks[doc_id].append(chunk_response)
-            all_chunks.append((doc_id, chunk_response))
-
-        # Sort all chunks by score if requested
-        if request.sort_by_score:
-            all_chunks.sort(key=lambda x: x[1].score, reverse=True)
-
-            # Rebuild document_chunks with sorted chunks
-            document_chunks = {}
-            for doc_id, chunk in all_chunks:
-                if doc_id not in document_chunks:
-                    document_chunks[doc_id] = []
-                if len(document_chunks[doc_id]) < request.chunks_per_document:
-                    document_chunks[doc_id].append(chunk)
-        else:
-            # Sort chunks within each document and apply limit
-            for doc_id in document_chunks:
-                if request.sort_by_score:
-                    # Sort by score within document
-                    document_chunks[doc_id].sort(key=lambda x: x.score, reverse=True)
-                else:
-                    # Sort by page number and chunk index to maintain document flow
-                    document_chunks[doc_id].sort(
-                        key=lambda x: (x.page_number or 0, x.chunk_index or 0)
-                    )
-                if request.chunks_per_document:
-                    document_chunks[doc_id] = document_chunks[doc_id][
-                        : request.chunks_per_document
-                    ]
 
         # Get document metadata for documents with matching chunks
         document_ids = list(document_chunks.keys())
@@ -479,7 +451,7 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
             return {
                 "documents": [],
                 "total": 0,
-                "message": "No matching chunks found above score threshold",
+                "message": "No matching documents found",
             }
 
         query = (
@@ -504,12 +476,6 @@ async def search_documents(request: SearchRequest, db: AsyncSession = Depends(ge
                 chunks=document_chunks.get(doc.id, []),
             )
             response_documents.append(doc_response)
-
-        # Sort documents by their highest scoring chunk
-        if request.sort_by_score:
-            response_documents.sort(
-                key=lambda x: max((c.score for c in x.chunks), default=0), reverse=True
-            )
 
         return {
             "documents": response_documents,
