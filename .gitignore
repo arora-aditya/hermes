@@ -1,5 +1,11 @@
 backend/uploads/
 uploads/
+.cursor/
+roomodes.json
+logs/
+include/
+.plans
+.rooignore
 
 # Virtual Environment
 venv/
