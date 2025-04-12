@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { FileInfo, apiService } from '@/services/api';
+import { DirectoryTreeResponse, apiService } from '@/services/api';
 import { toast } from 'sonner';
 
 export const useFiles = (userId: number) => {
-    const [files, setFiles] = useState<FileInfo[]>([]);
+    const [files, setFiles] = useState<DirectoryTreeResponse>({ children: [] });
     const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
 
@@ -13,8 +13,8 @@ export const useFiles = (userId: number) => {
 
     const fetchFiles = async () => {
         try {
-            const files = await apiService.listFiles(userId);
-            setFiles(files);
+            const response = await apiService.listFiles(userId);
+            setFiles({ children: response.children });
         } catch (error) {
             console.error('Error fetching files:', error);
             toast.error('Failed to fetch files');
@@ -40,6 +40,8 @@ export const useFiles = (userId: number) => {
             await apiService.ingestFiles(userId, Array.from(selectedFiles));
             setSelectedFiles(new Set());
             toast.success('Files indexed successfully');
+            // Refresh the file list to get updated ingestion status
+            await fetchFiles();
         } catch (error) {
             console.error('Indexing error:', error);
             toast.error('Failed to index files');

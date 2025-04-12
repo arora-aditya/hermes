@@ -5,8 +5,28 @@ const API_BASE_URL = 'http://localhost:8000/api';
 export interface FileInfo {
     id: number;
     filename: string;
-    path: string;
-    size: number;
+    is_ingested: boolean;
+    created_at: string;
+    updated_at?: string;
+}
+
+export interface DirectoryTreeNode {
+    type: 'file' | 'directory';
+    name: string;
+    path: string[];
+    children?: DirectoryTreeNode[];
+    document?: {
+        id: number;
+        filename: string;
+        path_array: string[];
+        is_ingested: boolean;
+        created_at: string;
+        updated_at?: string;
+    };
+}
+
+export interface DirectoryTreeResponse {
+    children: DirectoryTreeNode[];
 }
 
 export interface UploadResponse {
@@ -55,8 +75,8 @@ class ApiService {
         },
     });
 
-    async listFiles(userId: number): Promise<FileInfo[]> {
-        const response = await this.api.get<FileInfo[]>(`/documents/${userId}`);
+    async listFiles(userId: number): Promise<DirectoryTreeResponse> {
+        const response = await this.api.get<DirectoryTreeResponse>(`/documents/${userId}`);
         return response.data;
     }
 

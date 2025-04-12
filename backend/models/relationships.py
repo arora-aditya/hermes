@@ -4,9 +4,9 @@ to avoid circular dependencies.
 """
 
 from models.document import Document
-from models.user_document import UserDocument
-from models.user import User
 from models.organization import Organization
+from models.user import User
+from models.user_document import UserDocument
 from sqlalchemy.orm import relationship
 
 

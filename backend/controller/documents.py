@@ -1,19 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from typing import List, Optional
-from pathlib import Path
-from pydantic import BaseModel, Field
-from models.document import Document
-from models.user_document import UserDocument
-from utils.database import get_db
-from utils.docs.chunk import Chunk
-from utils.docs.embed import Embeddings
-from utils.docs.search import Search
+import logging
 import os
 import shutil
+from pathlib import Path
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from langchain_community.document_loaders import PyPDFLoader
-import logging
+from models.document import Document
+from models.user_document import UserDocument
+from pydantic import BaseModel, Field
+from schemas.document import DirectoryTreeResponse, DocumentResponse
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.database import get_db
+from utils.docs.chunk import Chunk
+from utils.docs.directory import build_directory_tree
+from utils.docs.embed import Embeddings
+from utils.docs.search import Search
 
 # Configure logging
 logging.basicConfig(
@@ -70,17 +73,35 @@ search_service = Search()
 async def upload_documents(
     user_id: int,
     files: List[UploadFile] = File(...),
+    path: Optional[str] = Query(
+        None, description="Target directory path (e.g., 'projects/2024')"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         logger.info(
-            f"Starting document upload for user_id={user_id}, files={[f.filename for f in files]}"
+            f"Starting document upload for user_id={user_id}, files={[f.filename for f in files]}, path={path}"
         )
+
+        # Convert path string to array if provided
+        path_array = path.split("/") if path else []
+
         saved_files = []
         for file in files:
             logger.debug(f"Processing file: {file.filename}")
+
+            # Create full path array including filename
+            full_path_array = path_array + [file.filename]
+
+            # Create directory structure if needed
+            if path_array:
+                dir_path = UPLOAD_DIR.joinpath(*path_array)
+                dir_path.mkdir(parents=True, exist_ok=True)
+                file_path = dir_path / file.filename
+            else:
+                file_path = UPLOAD_DIR / file.filename
+
             # Save file to disk
-            file_path = UPLOAD_DIR / file.filename
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             logger.debug(f"File saved to disk: {file_path}")
@@ -88,6 +109,7 @@ async def upload_documents(
             # Create document record
             doc = Document(
                 filename=file.filename,
+                path_array=full_path_array,
                 file_path=str(file_path.absolute()),
                 is_ingested=False,
             )
@@ -100,25 +122,8 @@ async def upload_documents(
             user_doc = UserDocument(user_id=user_id, document_id=doc.id)
             db.add(user_doc)
             await db.commit()
-            logger.debug(
-                f"User-document mapping created: user_id={user_id}, document_id={doc.id}"
-            )
 
-            saved_files.append(
-                DocumentResponse.model_validate(
-                    {
-                        "id": doc.id,
-                        "filename": doc.filename,
-                        "is_ingested": doc.is_ingested,
-                        "created_at": (
-                            doc.created_at.isoformat() if doc.created_at else None
-                        ),
-                        "updated_at": (
-                            doc.updated_at.isoformat() if doc.updated_at else None
-                        ),
-                    }
-                )
-            )
+            saved_files.append(DocumentResponse.model_validate(doc))
 
         logger.info(
             f"Successfully uploaded {len(saved_files)} files for user_id={user_id}"
@@ -134,9 +139,17 @@ async def upload_documents(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{user_id}", response_model=List[DocumentResponse])
-async def list_documents(user_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/{user_id}", response_model=DirectoryTreeResponse)
+async def list_documents(
+    user_id: int,
+    path: Optional[str] = Query(None, description="Filter by directory path"),
+    recursive: bool = Query(True, description="Include subdirectories"),
+    db: AsyncSession = Depends(get_db),
+):
     try:
+        # Convert path string to array if provided
+        path_array = path.split("/") if path else None
+
         # Query documents through user_documents relationship
         query = (
             select(Document)
@@ -144,28 +157,23 @@ async def list_documents(user_id: int, db: AsyncSession = Depends(get_db)):
             .join(UserDocument)
             .where(UserDocument.user_id == user_id)
         )
+
+        # Add path filter if provided and not recursive
+        if path_array and not recursive:
+            query = query.where(Document.path_array == path_array)
+
         result = await db.execute(query)
         documents = result.unique().scalars().all()
 
-        # Convert SQLAlchemy models to dictionaries before Pydantic validation
-        return [
-            DocumentResponse.model_validate(
-                {
-                    "id": doc.id,
-                    "filename": doc.filename,
-                    "is_ingested": doc.is_ingested,
-                    "created_at": (
-                        doc.created_at.isoformat() if doc.created_at else None
-                    ),
-                    "updated_at": (
-                        doc.updated_at.isoformat() if doc.updated_at else None
-                    ),
-                }
-            )
-            for doc in documents
-        ]
+        # Build directory tree
+        tree_children = build_directory_tree(
+            documents, path_array if not recursive else None
+        )
+
+        return DirectoryTreeResponse(children=tree_children)
 
     except Exception as e:
+        logger.error(f"Error listing documents: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
