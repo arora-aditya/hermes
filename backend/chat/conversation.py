@@ -1,12 +1,14 @@
-from pydantic import BaseModel, UUID4
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from models.conversation import Message, ConversationHistory
-from uuid import UUID
-from fastapi import HTTPException
-from typing import List, Dict
-from controller.documents import search_documents, SearchRequest
 import logging
+from typing import Dict, List
+from uuid import UUID
+
+from controller.documents import document_routes
+from fastapi import HTTPException
+from models.conversation import ConversationHistory, Message
+from pydantic import UUID4, BaseModel
+from schemas.document import SearchRequest
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

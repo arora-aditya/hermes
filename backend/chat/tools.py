@@ -1,8 +1,10 @@
-from typing import Optional, Callable
-from langchain_core.tools import tool
-from controller.documents import search_documents, SearchRequest
-from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+from typing import Callable, Optional
+
+from controller.documents import document_routes
+from langchain_core.tools import tool
+from schemas.document import SearchRequest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +41,7 @@ def create_search_documents_tool(user_id: str, db: AsyncSession) -> Callable:
                 sort_by_score=True,
             )
 
-            search_response = await search_documents(search_request, db)
+            search_response = await document_routes.search_documents(search_request, db)
 
             if search_response.get("documents"):
                 context_chunks = []

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DocumentBase(BaseModel):
@@ -20,6 +20,31 @@ class DocumentResponse(DocumentBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChunkResponse(BaseModel):
+    content: str
+    score: float
+    page_number: Optional[int]
+    chunk_index: Optional[int]
+
+
+class DocumentWithChunksResponse(DocumentResponse):
+    chunks: List[ChunkResponse] = []
+
+
+class SearchRequest(BaseModel):
+    query: str
+    user_id: int
+    chunks_per_document: Optional[int] = 50
+    min_score: Optional[float] = 0.7
+    sort_by_score: Optional[bool] = True
+
+
+class IngestRequest(BaseModel):
+    document_ids: List[int] = Field(
+        ..., description="List of document IDs to ingest", min_items=1
+    )
 
 
 class DirectoryNode(BaseModel):
