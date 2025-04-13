@@ -1,20 +1,23 @@
-from load_env import IS_ENV_LOADED
-from fastapi import FastAPI, Depends, Request
-from chat.agent import ChatRequest
-from chat.agent import Agent
-from chat.conversation import ConversationService
-from fastapi.middleware.cors import CORSMiddleware
-from typing import List
-from sqlalchemy.ext.asyncio import AsyncSession
-from contextlib import asynccontextmanager
-from uuid import UUID
-from controller import users, organizations, documents
-from utils.database import get_db
-from models.relationships import setup_relationships
-from utils.logging_config import setup_logging
+import json
 import logging
 import time
+from contextlib import asynccontextmanager
+from typing import List
+from uuid import UUID
+
 import uvicorn
+from chat.agent import Agent, ChatRequest
+from chat.conversation import ConversationService
+from chat.rag_streaming import RAGStreamingAgent
+from controller import documents, organizations, users
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from load_env import IS_ENV_LOADED
+from models.relationships import setup_relationships
+from schemas.streaming import StreamingChatRequest
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.database import get_db
+from utils.logging_config import setup_logging
 
 # Set up logging
 setup_logging()
@@ -104,7 +107,9 @@ def read_root():
     return {"status": "healthy", "service": "Hermes API"}
 
 
+# Initialize agents
 agent = Agent()
+rag_streaming_agent = RAGStreamingAgent()
 
 
 @app.post("/api/chat")
@@ -139,6 +144,17 @@ async def delete_conversation(
     success = await ConversationService.delete_conversation(db_session, conversation_id)
     await db_session.commit()
     return {"success": success}
+
+
+@app.post("/api/chat/stream/rag")
+async def stream_rag_chat(
+    request: StreamingChatRequest, db_session: AsyncSession = Depends(get_db)
+):
+    """
+    Stream chat responses with RAG integration using Server-Sent Events (SSE).
+    This endpoint provides real-time feedback about document search and token-by-token response streaming.
+    """
+    return await rag_streaming_agent.create_streaming_response(request, db_session)
 
 
 if __name__ == "__main__":

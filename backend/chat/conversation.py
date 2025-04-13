@@ -126,9 +126,11 @@ class ConversationService:
     ) -> List[Dict[str, str]]:
         """Prepare messages for LLM including system prompt, relevant document context, and conversation history."""
         # Get conversation history
-        conversation_messages = await ConversationService.get_conversation_messages(
-            db, request.conversation_id
-        )
+        conversation_messages = []
+        if request.conversation_id:
+            conversation_messages = await ConversationService.get_conversation_messages(
+                db, request.conversation_id
+            )
 
         # Prepare messages for the model
         messages = [system_prompt]  # Start with system prompt
