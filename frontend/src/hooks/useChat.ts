@@ -5,6 +5,7 @@ type StreamingStatus = {
     isSearching: boolean;
     isThinking: boolean;
     isStreaming: boolean;
+    searchResultCount?: number;
 };
 
 export const useChat = (userId: number) => {
@@ -16,7 +17,8 @@ export const useChat = (userId: number) => {
     const [streamingStatus, setStreamingStatus] = useState<StreamingStatus>({
         isSearching: false,
         isThinking: false,
-        isStreaming: false
+        isStreaming: false,
+        searchResultCount: undefined
     });
 
     // Use ref to track the latest message content to prevent race conditions
@@ -116,11 +118,12 @@ export const useChat = (userId: number) => {
             };
             setMessages(prev => [...prev, newMessage]);
 
-            // Reset streaming states
+            // Reset streaming states to initial state
             setStreamingStatus({
                 isSearching: false,
                 isThinking: false,
-                isStreaming: false
+                isStreaming: false,
+                searchResultCount: undefined
             });
             latestMessageRef.current = '';
 
@@ -142,19 +145,35 @@ export const useChat = (userId: number) => {
                 },
                 {
                     onSearchStart: () => {
-                        setStreamingStatus(prev => ({ ...prev, isSearching: true }));
+                        setStreamingStatus({
+                            isSearching: true,
+                            isThinking: false,
+                            isStreaming: false,
+                            searchResultCount: undefined
+                        });
                     },
-                    onSearchComplete: () => {
-                        setStreamingStatus(prev => ({ ...prev, isSearching: false }));
+                    onSearchComplete: (metadata) => {
+                        setStreamingStatus(prev => ({
+                            isSearching: false,
+                            isThinking: true,
+                            isStreaming: false,
+                            searchResultCount: metadata?.count
+                        }));
                     },
                     onThinkingStart: () => {
-                        setStreamingStatus(prev => ({ ...prev, isThinking: true }));
+                        setStreamingStatus(prev => ({
+                            isSearching: false,
+                            isThinking: true,
+                            isStreaming: false,
+                            searchResultCount: prev.searchResultCount
+                        }));
                     },
                     onThinkingComplete: () => {
                         setStreamingStatus(prev => ({
-                            ...prev,
+                            isSearching: false,
                             isThinking: false,
-                            isStreaming: true
+                            isStreaming: true,
+                            searchResultCount: prev.searchResultCount
                         }));
                         latestMessageRef.current = '';
                         setMessages(prev => {
@@ -176,7 +195,6 @@ export const useChat = (userId: number) => {
                                 const lastMessage = newMessages[newMessages.length - 1];
                                 // Only update if the content would change
                                 if (lastMessage.content !== latestMessageRef.current) {
-                                    console.log('Updating message content to:', latestMessageRef.current);
                                     lastMessage.content = latestMessageRef.current;
                                     return newMessages;
                                 }
@@ -185,22 +203,36 @@ export const useChat = (userId: number) => {
                         });
                     },
                     onComplete: () => {
-                        setStreamingStatus(prev => ({ ...prev, isStreaming: false }));
+                        setStreamingStatus({
+                            isSearching: false,
+                            isThinking: false,
+                            isStreaming: false,
+                            searchResultCount: undefined
+                        });
                     },
                     onError: (error) => {
                         console.error('Streaming error:', error);
+                        // Reset status on error
+                        setStreamingStatus({
+                            isSearching: false,
+                            isThinking: false,
+                            isStreaming: false,
+                            searchResultCount: undefined
+                        });
                     }
                 }
             );
         } catch (error) {
             console.error('Failed to stream message:', error);
-        } finally {
-            setIsLoading(false);
+            // Reset status on error
             setStreamingStatus({
                 isSearching: false,
                 isThinking: false,
-                isStreaming: false
+                isStreaming: false,
+                searchResultCount: undefined
             });
+        } finally {
+            setIsLoading(false);
         }
     };
 

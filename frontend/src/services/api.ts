@@ -70,11 +70,14 @@ export interface ConversationResponse {
 export interface StreamingEvent {
     event: 'search_start' | 'search_complete' | 'thinking_start' | 'thinking_complete' | 'token' | 'complete';
     data?: string;
+    metadata?: {
+        count?: number;
+    };
 }
 
 export interface StreamingEventCallbacks {
     onSearchStart?: () => void;
-    onSearchComplete?: () => void;
+    onSearchComplete?: (metadata?: { count?: number }) => void;
     onThinkingStart?: () => void;
     onThinkingComplete?: () => void;
     onToken?: (token: string) => void;
@@ -228,7 +231,6 @@ class ApiService {
 
                     try {
                         const jsonStr = trimmedLine.slice(6); // Remove 'data: ' prefix
-                        console.log('Processing line:', jsonStr);
                         const eventData = JSON.parse(jsonStr) as StreamingEvent;
 
                         switch (eventData.event) {
@@ -236,7 +238,7 @@ class ApiService {
                                 callbacks.onSearchStart?.();
                                 break;
                             case 'search_complete':
-                                callbacks.onSearchComplete?.();
+                                callbacks.onSearchComplete?.(eventData.metadata);
                                 break;
                             case 'thinking_start':
                                 callbacks.onThinkingStart?.();
@@ -246,7 +248,6 @@ class ApiService {
                                 break;
                             case 'token':
                                 if (eventData.data) {
-                                    console.log('Processing single token:', eventData.data);
                                     callbacks.onToken?.(eventData.data);
                                 }
                                 break;
