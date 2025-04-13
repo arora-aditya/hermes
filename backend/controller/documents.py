@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import List, Optional
@@ -65,6 +66,12 @@ class DocumentRoutes:
             "/move/{document_id}", self.move_document, methods=["PUT"]
         )
 
+    def _get_storage_filename(self, document_id: int, original_filename: str) -> str:
+        """Generate a unique storage filename based on document ID and original extension."""
+        # Extract extension from original filename, default to .pdf if none
+        ext = os.path.splitext(original_filename)[1].lower() or ".pdf"
+        return f"{document_id}{ext}"
+
     async def upload_documents(
         self,
         user_id: int,
@@ -82,29 +89,27 @@ class DocumentRoutes:
 
             saved_files = []
             for file in files:
-                # Create full path array including filename
-                full_path_array = path_array + [file.filename]
-
-                # Create directory structure if needed
-                if path_array:
-                    dir_path = self.upload_dir.joinpath(*path_array)
-                    dir_path.mkdir(parents=True, exist_ok=True)
-                    file_path = dir_path / file.filename
-                else:
-                    file_path = self.upload_dir / file.filename
-
-                # Save file to disk
-                with file_path.open("wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-
-                # Create document record
+                # Create document record first to get the ID
                 doc = Document(
                     filename=file.filename,
-                    path_array=full_path_array,
-                    file_path=str(file_path.absolute()),
+                    path_array=path_array + [file.filename],
+                    file_path="",  # Temporary empty path
                     is_ingested=False,
                 )
                 db.add(doc)
+                await db.commit()
+                await db.refresh(doc)
+
+                # Generate unique storage filename
+                storage_filename = self._get_storage_filename(doc.id, file.filename)
+
+                # Save file directly to upload directory
+                file_path = self.upload_dir / storage_filename
+                with file_path.open("wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+
+                # Update document with actual file path
+                doc.file_path = str(file_path.absolute())
                 await db.commit()
                 await db.refresh(doc)
 
@@ -201,13 +206,16 @@ class DocumentRoutes:
             if old_file_path.exists():
                 old_file_path.unlink()
 
-            # Save new file
-            file_path = self.upload_dir / file.filename
+            # Generate storage filename using existing document ID
+            storage_filename = self._get_storage_filename(document_id, file.filename)
+
+            # Save new file directly to upload directory
+            file_path = self.upload_dir / storage_filename
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
 
             # Update document record
-            document.filename = file.filename
+            document.filename = file.filename  # Keep original filename in DB
             document.file_path = str(file_path.absolute())
             document.is_ingested = False
             await db.commit()
@@ -485,29 +493,14 @@ class DocumentRoutes:
             if not document:
                 raise HTTPException(status_code=404, detail="Document not found")
 
-            # Convert new path string to array
+            # Convert new path string to array and update path_array
             new_path_array = new_path.split("/") if new_path else []
-            new_path_array.append(document.filename)  # Keep original filename
+            new_path_array.append(
+                document.filename
+            )  # Keep original filename in path_array
 
-            # Create new directory structure if needed
-            if new_path:
-                new_dir_path = self.upload_dir.joinpath(*new_path.split("/"))
-                new_dir_path.mkdir(parents=True, exist_ok=True)
-                new_file_path = new_dir_path / document.filename
-            else:
-                new_file_path = self.upload_dir / document.filename
-
-            # Move file on disk
-            old_file_path = Path(document.file_path)
-            if old_file_path.exists():
-                shutil.move(str(old_file_path), str(new_file_path))
-            else:
-                logger.error(f"Source file not found: {old_file_path}")
-                raise HTTPException(status_code=404, detail="Source file not found")
-
-            # Update document record
+            # Update document record with new path_array (no need to move the file)
             document.path_array = new_path_array
-            document.file_path = str(new_file_path.absolute())
             await db.commit()
             await db.refresh(document)
 
@@ -524,8 +517,6 @@ class DocumentRoutes:
                 ),
             )
 
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error moving document: {str(e)}")
             await db.rollback()
