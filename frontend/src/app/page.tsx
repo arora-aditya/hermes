@@ -11,7 +11,7 @@ import { ConversationHistory } from './components/ConversationHistory';
 export default function Home() {
   const userId = 2;
   const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles, moveFile, deleteFile } = useFiles(userId);
-  const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat(userId);
+  const { conversations, isLoadingConversations, messages, isLoading, sendStreamingMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId, streamingStatus } = useChat(userId);
 
   useEffect(() => {
     resetConversation();
@@ -46,10 +46,10 @@ export default function Home() {
         <div className="flex-1 flex flex-col relative">
           <div className="absolute inset-0 flex flex-col">
             <div className="flex-1 overflow-y-auto p-4">
-              <ChatHistory messages={messages} />
+              <ChatHistory messages={messages} streamingStatus={streamingStatus} />
             </div>
             <div className="p-4 border-t">
-              <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+              <ChatInput onSendMessage={sendStreamingMessage} disabled={isLoading} />
             </div>
           </div>
         </div>

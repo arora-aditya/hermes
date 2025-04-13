@@ -6,6 +6,9 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ content, role }: ChatMessageProps) {
+    if (content === '') {
+        return null;
+    }
     return (
         <div className={cn(
             "flex w-full",

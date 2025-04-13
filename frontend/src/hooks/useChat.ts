@@ -1,5 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Message, apiService, ChatResponse, Conversation } from '../services/api';
+
+type StreamingStatus = {
+    isSearching: boolean;
+    isThinking: boolean;
+    isStreaming: boolean;
+};
 
 export const useChat = (userId: number) => {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -7,6 +13,19 @@ export const useChat = (userId: number) => {
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+    const [streamingStatus, setStreamingStatus] = useState<StreamingStatus>({
+        isSearching: false,
+        isThinking: false,
+        isStreaming: false
+    });
+
+    // Use ref to track the latest message content to prevent race conditions
+    const latestMessageRef = useRef<string>('');
+
+    // Derive currentStreamingMessage from the messages array
+    const currentStreamingMessage = messages.length > 0 && messages[messages.length - 1].role === 'assistant'
+        ? messages[messages.length - 1].content
+        : '';
 
     const createConversation = async () => {
         try {
@@ -84,6 +103,107 @@ export const useChat = (userId: number) => {
         }
     };
 
+    const sendStreamingMessage = async (content: string) => {
+        setIsLoading(true);
+        try {
+            // Add user message immediately
+            const newMessage: Message = {
+                message_id: Date.now(),
+                conversation_id: conversationId || '',
+                content,
+                role: 'user',
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, newMessage]);
+
+            // Reset streaming states
+            setStreamingStatus({
+                isSearching: false,
+                isThinking: false,
+                isStreaming: false
+            });
+            latestMessageRef.current = '';
+
+            // Create response placeholder
+            const responseMessage: Message = {
+                message_id: Date.now() + 1,
+                conversation_id: conversationId || '',
+                content: '',
+                role: 'assistant',
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, responseMessage]);
+
+            await apiService.streamChat(
+                {
+                    message: content,
+                    user_id: userId.toString(),
+                    conversation_id: conversationId || undefined
+                },
+                {
+                    onSearchStart: () => {
+                        setStreamingStatus(prev => ({ ...prev, isSearching: true }));
+                    },
+                    onSearchComplete: () => {
+                        setStreamingStatus(prev => ({ ...prev, isSearching: false }));
+                    },
+                    onThinkingStart: () => {
+                        setStreamingStatus(prev => ({ ...prev, isThinking: true }));
+                    },
+                    onThinkingComplete: () => {
+                        setStreamingStatus(prev => ({
+                            ...prev,
+                            isThinking: false,
+                            isStreaming: true
+                        }));
+                        latestMessageRef.current = '';
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            if (newMessages.length > 0) {
+                                newMessages[newMessages.length - 1].content = '';
+                            }
+                            return newMessages;
+                        });
+                    },
+                    onToken: (token) => {
+                        // Update ref first
+                        latestMessageRef.current = latestMessageRef.current + token;
+
+                        // Then update state with the ref value
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            if (newMessages.length > 0) {
+                                const lastMessage = newMessages[newMessages.length - 1];
+                                // Only update if the content would change
+                                if (lastMessage.content !== latestMessageRef.current) {
+                                    console.log('Updating message content to:', latestMessageRef.current);
+                                    lastMessage.content = latestMessageRef.current;
+                                    return newMessages;
+                                }
+                            }
+                            return prev;
+                        });
+                    },
+                    onComplete: () => {
+                        setStreamingStatus(prev => ({ ...prev, isStreaming: false }));
+                    },
+                    onError: (error) => {
+                        console.error('Streaming error:', error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('Failed to stream message:', error);
+        } finally {
+            setIsLoading(false);
+            setStreamingStatus({
+                isSearching: false,
+                isThinking: false,
+                isStreaming: false
+            });
+        }
+    };
+
     const setCurrentConversation = async (newConversationId: string | undefined) => {
         setConversationId(newConversationId || null);
         if (newConversationId) {
@@ -106,12 +226,15 @@ export const useChat = (userId: number) => {
         messages,
         isLoading,
         sendMessage,
+        sendStreamingMessage,
         resetConversation,
         conversationId,
         conversations,
         isLoadingConversations,
         setCurrentConversation,
         createConversation,
-        deleteConversation
+        deleteConversation,
+        streamingStatus,
+        currentStreamingMessage
     };
 } 

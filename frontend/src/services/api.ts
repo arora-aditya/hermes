@@ -67,6 +67,27 @@ export interface ConversationResponse {
     messages: Message[];
 }
 
+export interface StreamingEvent {
+    event: 'search_start' | 'search_complete' | 'thinking_start' | 'thinking_complete' | 'token' | 'complete';
+    data?: string;
+}
+
+export interface StreamingEventCallbacks {
+    onSearchStart?: () => void;
+    onSearchComplete?: () => void;
+    onThinkingStart?: () => void;
+    onThinkingComplete?: () => void;
+    onToken?: (token: string) => void;
+    onComplete?: () => void;
+    onError?: (error: Error) => void;
+}
+
+export interface StreamingChatRequest {
+    message: string;
+    user_id: string;
+    conversation_id?: string;
+}
+
 class ApiService {
     private api = axios.create({
         baseURL: API_BASE_URL,
@@ -167,6 +188,96 @@ class ApiService {
 
     async deleteFile(userId: number, documentId: number): Promise<void> {
         await this.api.delete(`/documents/${documentId}?user_id=${userId}`);
+    }
+
+    async streamChat(request: StreamingChatRequest, callbacks: StreamingEventCallbacks): Promise<void> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/stream/rag`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(request)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No reader available');
+
+            let buffer = '';
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Convert chunk to text and add to buffer
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete lines from buffer
+                const lines = buffer.split('\n');
+                // Keep the last potentially incomplete line in buffer
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+                    try {
+                        const jsonStr = trimmedLine.slice(6); // Remove 'data: ' prefix
+                        console.log('Processing line:', jsonStr);
+                        const eventData = JSON.parse(jsonStr) as StreamingEvent;
+
+                        switch (eventData.event) {
+                            case 'search_start':
+                                callbacks.onSearchStart?.();
+                                break;
+                            case 'search_complete':
+                                callbacks.onSearchComplete?.();
+                                break;
+                            case 'thinking_start':
+                                callbacks.onThinkingStart?.();
+                                break;
+                            case 'thinking_complete':
+                                callbacks.onThinkingComplete?.();
+                                break;
+                            case 'token':
+                                if (eventData.data) {
+                                    console.log('Processing single token:', eventData.data);
+                                    callbacks.onToken?.(eventData.data);
+                                }
+                                break;
+                            case 'complete':
+                                // Process any remaining buffer before completing
+                                if (buffer.trim()) {
+                                    const remainingLine = buffer.trim();
+                                    if (remainingLine.startsWith('data: ')) {
+                                        try {
+                                            const remainingData = JSON.parse(remainingLine.slice(6)) as StreamingEvent;
+                                            if (remainingData.event === 'token' && remainingData.data) {
+                                                callbacks.onToken?.(remainingData.data);
+                                            }
+                                        } catch (e) {
+                                            console.warn('Error processing remaining buffer:', e);
+                                        }
+                                    }
+                                }
+                                callbacks.onComplete?.();
+                                break;
+                        }
+                    } catch (error) {
+                        console.error('Error parsing streaming event:', error, 'Line:', line);
+                        callbacks.onError?.(new Error('Failed to parse streaming event'));
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Streaming chat error:', error);
+            callbacks.onError?.(error instanceof Error ? error : new Error('Unknown streaming error'));
+        }
     }
 }
 
