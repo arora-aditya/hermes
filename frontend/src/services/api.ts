@@ -157,6 +157,17 @@ class ApiService {
         const response = await this.api.delete<Conversation>(`/chat/conversation/${conversationId}`);
         return response.data;
     }
+
+    async moveFile(userId: number, documentId: number, newPath: string): Promise<FileInfo> {
+        const response = await this.api.put<FileInfo>(
+            `/documents/move/${documentId}?user_id=${userId}&new_path=${encodeURIComponent(newPath)}`
+        );
+        return response.data;
+    }
+
+    async deleteFile(userId: number, documentId: number): Promise<void> {
+        await this.api.delete(`/documents/${documentId}?user_id=${userId}`);
+    }
 }
 
 export const apiService = new ApiService(); 

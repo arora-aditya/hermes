@@ -9,6 +9,8 @@ interface FileListProps {
     loading: boolean;
     toggleFileSelection: (document_id: number) => void;
     handleIndex: () => Promise<void>;
+    moveFile: (documentId: number, newPath: string) => Promise<void>;
+    deleteFile: (documentId: number) => Promise<void>;
 }
 
 export const FileList: React.FC<FileListProps> = ({
@@ -17,6 +19,8 @@ export const FileList: React.FC<FileListProps> = ({
     loading,
     toggleFileSelection,
     handleIndex,
+    moveFile,
+    deleteFile,
 }) => {
     if (loading) {
         return <div className="text-sm text-gray-500 px-4 py-2">Loading files...</div>;
@@ -30,14 +34,16 @@ export const FileList: React.FC<FileListProps> = ({
                     node={node}
                     selectedFiles={selectedFiles}
                     toggleFileSelection={toggleFileSelection}
+                    onMoveFile={moveFile}
+                    onDeleteFile={deleteFile}
                 />
             ))}
             <button
                 onClick={handleIndex}
                 disabled={selectedFiles.size === 0}
                 className={`w-full mt-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedFiles.size === 0
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
                     }`}
             >
                 Index Files

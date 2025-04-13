@@ -29,19 +29,20 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     return (
         <div className="space-y-1">
             {conversations.map((conversation) => (
-                <div className="flex items-center justify-between"
+                <div className="flex items-center justify-between px-2"
                     key={conversation.conversation_id}>
                     <button
                         onClick={() => onSelectConversation(conversation.conversation_id)}
-                        className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors ${currentConversationId === conversation.conversation_id
-                                ? 'bg-gray-200 text-gray-900'
-                                : 'text-gray-700 hover:bg-gray-100'
+                        className={`flex-1 text-left px-4 py-2 text-sm rounded-lg transition-colors ${currentConversationId === conversation.conversation_id
+                            ? 'bg-gray-200 text-gray-900'
+                            : 'text-gray-700 hover:bg-gray-100'
                             }`}
                     >
                         Conversation {new Date(conversation.created_at).toLocaleDateString()}
                     </button>
                     <button
                         onClick={() => onDeleteConversation(conversation.conversation_id)}
+                        className="p-2 hover:text-red-600 transition-colors"
                     >
                         <Trash className="w-4 h-4" />
                     </button>

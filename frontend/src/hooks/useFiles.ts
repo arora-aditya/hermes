@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DirectoryTreeResponse, apiService } from '@/services/api';
+import { DirectoryTreeResponse, apiService, DirectoryTreeNode } from '@/services/api';
 import { toast } from 'sonner';
 
 export const useFiles = (userId: number) => {
@@ -20,6 +20,17 @@ export const useFiles = (userId: number) => {
             toast.error('Failed to fetch files');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const moveFile = async (documentId: number, newPath: string) => {
+        try {
+            await apiService.moveFile(userId, documentId, newPath);
+            toast.success('File moved successfully');
+            await fetchFiles(); // Refresh the file list
+        } catch (error) {
+            console.error('Error moving file:', error);
+            toast.error('Failed to move file');
         }
     };
 
@@ -48,6 +59,44 @@ export const useFiles = (userId: number) => {
         }
     };
 
+    const deleteFile = async (documentId: number) => {
+        try {
+            await apiService.deleteFile(userId, documentId);
+            // Remove the file from local state
+            setFiles(prevFiles => {
+                const removeFileFromTree = (nodes: DirectoryTreeNode[]): DirectoryTreeNode[] => {
+                    return nodes.reduce<DirectoryTreeNode[]>((acc, node) => {
+                        if (node.type === 'directory') {
+                            return [...acc, {
+                                ...node,
+                                children: removeFileFromTree(node.children || [])
+                            }];
+                        } else if (node.type === 'file' && node.document?.id !== documentId) {
+                            return [...acc, node];
+                        }
+                        return acc;
+                    }, []);
+                };
+
+                return {
+                    children: removeFileFromTree(prevFiles.children)
+                };
+            });
+
+            // Also remove from selected files if it was selected
+            setSelectedFiles(prev => {
+                const newSelected = new Set(prev);
+                newSelected.delete(documentId);
+                return newSelected;
+            });
+
+            toast.success('File deleted successfully');
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            toast.error('Failed to delete file');
+        }
+    };
+
     return {
         files,
         selectedFiles,
@@ -55,5 +104,7 @@ export const useFiles = (userId: number) => {
         toggleFileSelection,
         handleIndex,
         fetchFiles,
+        moveFile,
+        deleteFile,
     };
 }; 

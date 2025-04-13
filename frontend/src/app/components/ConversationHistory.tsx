@@ -18,6 +18,8 @@ interface ConversationHistoryProps {
     loading: boolean;
     toggleFileSelection: (document_id: number) => void;
     handleIndex: () => Promise<void>;
+    moveFile: (documentId: number, newPath: string) => Promise<void>;
+    deleteFile: (documentId: number) => Promise<void>;
 }
 
 export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
@@ -31,12 +33,14 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
     loading,
     toggleFileSelection,
     handleIndex,
+    moveFile,
+    deleteFile,
 }) => {
     const [isConversationsOpen, setIsConversationsOpen] = useState(true);
     const [isFilesOpen, setIsFilesOpen] = useState(true);
 
     return (
-        <div className="w-64 min-w-64 border-r h-screen bg-gray-50">
+        <div className="w-72 min-w-72 border-r h-screen bg-gray-50">
             <ScrollArea className="h-full px-4 py-4">
                 <CollapsibleSection
                     title="Conversations"
@@ -63,6 +67,8 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
                         loading={loading}
                         toggleFileSelection={toggleFileSelection}
                         handleIndex={handleIndex}
+                        moveFile={moveFile}
+                        deleteFile={deleteFile}
                     />
                 </CollapsibleSection>
             </ScrollArea>

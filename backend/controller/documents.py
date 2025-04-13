@@ -1,6 +1,5 @@
 import logging
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -62,6 +61,9 @@ class DocumentRoutes:
         )
         self.router.add_api_route("/ingest", self.ingest_documents, methods=["POST"])
         self.router.add_api_route("/search", self.search_documents, methods=["POST"])
+        self.router.add_api_route(
+            "/move/{document_id}", self.move_document, methods=["PUT"]
+        )
 
     async def upload_documents(
         self,
@@ -73,17 +75,13 @@ class DocumentRoutes:
         db: AsyncSession = Depends(get_db),
     ):
         try:
-            logger.info(
-                f"Starting document upload for user_id={user_id}, files={[f.filename for f in files]}, path={path}"
-            )
+            logger.info(f"Starting document upload for user_id={user_id}")
 
             # Convert path string to array if provided
             path_array = path.split("/") if path else []
 
             saved_files = []
             for file in files:
-                logger.debug(f"Processing file: {file.filename}")
-
                 # Create full path array including filename
                 full_path_array = path_array + [file.filename]
 
@@ -98,7 +96,6 @@ class DocumentRoutes:
                 # Save file to disk
                 with file_path.open("wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
-                logger.debug(f"File saved to disk: {file_path}")
 
                 # Create document record
                 doc = Document(
@@ -110,7 +107,6 @@ class DocumentRoutes:
                 db.add(doc)
                 await db.commit()
                 await db.refresh(doc)
-                logger.debug(f"Document record created: id={doc.id}")
 
                 # Create user-document mapping
                 user_doc = UserDocument(user_id=user_id, document_id=doc.id)
@@ -122,6 +118,7 @@ class DocumentRoutes:
                         {
                             "id": doc.id,
                             "filename": doc.filename,
+                            "path_array": doc.path_array,
                             "is_ingested": doc.is_ingested,
                             "created_at": (
                                 doc.created_at.isoformat() if doc.created_at else None
@@ -133,16 +130,11 @@ class DocumentRoutes:
                     )
                 )
 
-            logger.info(
-                f"Successfully uploaded {len(saved_files)} files for user_id={user_id}"
-            )
+            logger.info(f"Successfully uploaded {len(saved_files)} files")
             return saved_files
 
         except Exception as e:
-            logger.error(
-                f"Error during document upload for user_id={user_id}: {str(e)}",
-                exc_info=True,
-            )
+            logger.error(f"Error during document upload: {str(e)}")
             await db.rollback()
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -180,7 +172,7 @@ class DocumentRoutes:
             return DirectoryTreeResponse(children=tree_children)
 
         except Exception as e:
-            logger.error(f"Error listing documents: {str(e)}", exc_info=True)
+            logger.error(f"Error listing documents: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
     async def update_document(
@@ -225,6 +217,7 @@ class DocumentRoutes:
                 {
                     "id": document.id,
                     "filename": document.filename,
+                    "path_array": document.path_array,
                     "is_ingested": document.is_ingested,
                     "created_at": (
                         document.created_at.isoformat() if document.created_at else None
@@ -279,16 +272,11 @@ class DocumentRoutes:
         self, request: IngestRequest, user_id: int, db: AsyncSession = Depends(get_db)
     ):
         try:
-            logger.info(
-                f"Starting document ingestion for user_id={user_id}, document_ids={request.document_ids}"
-            )
+            logger.info(f"Starting document ingestion for user_id={user_id}")
             all_docs = []
 
             # Verify all documents exist and belong to user
             for doc_id in request.document_ids:
-                logger.debug(
-                    f"Verifying document access: doc_id={doc_id}, user_id={user_id}"
-                )
                 query = (
                     select(Document)
                     .distinct()
@@ -300,47 +288,30 @@ class DocumentRoutes:
                 document = result.unique().scalar_one_or_none()
 
                 if not document:
-                    logger.warning(
-                        f"Document not found or not accessible: doc_id={doc_id}, user_id={user_id}"
-                    )
                     raise HTTPException(
                         status_code=404,
                         detail=f"Document with id {doc_id} not found or not accessible",
                     )
                 all_docs.append(document)
-                logger.debug(f"Document verified: doc_id={doc_id}")
 
             # Process all documents
             processed_docs = []
             for document in all_docs:
                 try:
-                    logger.debug(
-                        f"Processing document: id={document.id}, filename={document.filename}"
-                    )
                     loader = PyPDFLoader(document.file_path)
                     pages = loader.load()
-                    logger.debug(
-                        f"Document loaded: id={document.id}, pages={len(pages)}"
-                    )
 
                     # Add document_id to each page's metadata
                     for page in pages:
                         page.metadata["document_id"] = document.id
-                        page.metadata["user_id"] = user_id  # Add user_id to metadata
-                        logger.debug(
-                            f"Added metadata to page: doc_id={document.id}, user_id={user_id}, page_number={page.metadata.get('page', 'unknown')}"
-                        )
+                        page.metadata["user_id"] = user_id
                     processed_docs.extend(pages)
 
                     # Update document status
                     document.is_ingested = True
                     await db.commit()
-                    logger.debug(f"Document marked as ingested: id={document.id}")
                 except Exception as e:
-                    logger.error(
-                        f"Error processing document {document.id}: {str(e)}",
-                        exc_info=True,
-                    )
+                    logger.error(f"Error processing document {document.id}: {str(e)}")
                     continue
 
             if not processed_docs:
@@ -357,9 +328,7 @@ class DocumentRoutes:
 
             logger.info("Starting embedding process")
             embeddings = self.embeddings_service.embed_docs(chunks)
-            logger.info(
-                f"Embedding complete. Created {len(embeddings) if isinstance(embeddings, list) else 1} embeddings"
-            )
+            logger.info(f"Embedding complete")
 
             return {
                 "message": "Documents ingested successfully",
@@ -371,13 +340,9 @@ class DocumentRoutes:
             }
 
         except HTTPException:
-            logger.error("HTTP exception during ingestion", exc_info=True)
-            await db.rollback()
             raise
         except Exception as e:
-            logger.error(
-                f"Unexpected error during document ingestion: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error during document ingestion: {str(e)}")
             await db.rollback()
             raise HTTPException(
                 status_code=500, detail=f"Error during document ingestion: {str(e)}"
@@ -389,16 +354,11 @@ class DocumentRoutes:
         try:
             # Input validation
             if not request.query.strip():
-                logger.warning(
-                    f"Empty search query received from user_id={request.user_id}"
-                )
                 raise HTTPException(
                     status_code=422, detail="Search query cannot be empty"
                 )
 
-            logger.info(
-                f"Search request received - query='{request.query}', user_id={request.user_id}"
-            )
+            logger.info(f"Starting search for query='{request.query}'")
 
             # First verify if user has any documents
             user_docs_query = (
@@ -410,32 +370,22 @@ class DocumentRoutes:
             user_doc_ids = [r[0] for r in result.all()]
 
             if not user_doc_ids:
-                logger.warning(f"User {request.user_id} has no documents")
                 return {
                     "documents": [],
                     "total": 0,
                     "message": "No documents found for this user",
                 }
 
-            logger.debug(
-                f"User {request.user_id} has access to documents: {user_doc_ids}"
-            )
-
             # Perform multi-query search with user filtering
             try:
-                logger.debug(
-                    f"Performing multi-query search with query: '{request.query}'"
-                )
                 search_results = self.search_service.search(
                     query=request.query,
                     user_id=request.user_id,
                     limit=request.chunks_per_document,
                 )
-                logger.info(
-                    f"Search returned {len(search_results) if search_results else 0} results"
-                )
+                logger.info(f"Search complete")
             except Exception as e:
-                logger.error(f"Error performing search: {str(e)}", exc_info=True)
+                logger.error(f"Error performing search: {str(e)}")
                 raise HTTPException(
                     status_code=500, detail=f"Error performing search: {str(e)}"
                 )
@@ -507,12 +457,79 @@ class DocumentRoutes:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(
-                f"Unexpected error during document search: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error during document search: {str(e)}")
             raise HTTPException(
                 status_code=500, detail=f"Error during document search: {str(e)}"
             )
+
+    async def move_document(
+        self,
+        document_id: int,
+        user_id: int,
+        new_path: str = Query(
+            ..., description="New directory path (e.g., 'projects/2024')"
+        ),
+        db: AsyncSession = Depends(get_db),
+    ):
+        try:
+            # Verify document exists and belongs to user
+            query = (
+                select(Document)
+                .join(UserDocument)
+                .where(Document.id == document_id)
+                .where(UserDocument.user_id == user_id)
+            )
+            result = await db.execute(query)
+            document = result.unique().scalar_one_or_none()
+
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            # Convert new path string to array
+            new_path_array = new_path.split("/") if new_path else []
+            new_path_array.append(document.filename)  # Keep original filename
+
+            # Create new directory structure if needed
+            if new_path:
+                new_dir_path = self.upload_dir.joinpath(*new_path.split("/"))
+                new_dir_path.mkdir(parents=True, exist_ok=True)
+                new_file_path = new_dir_path / document.filename
+            else:
+                new_file_path = self.upload_dir / document.filename
+
+            # Move file on disk
+            old_file_path = Path(document.file_path)
+            if old_file_path.exists():
+                shutil.move(str(old_file_path), str(new_file_path))
+            else:
+                logger.error(f"Source file not found: {old_file_path}")
+                raise HTTPException(status_code=404, detail="Source file not found")
+
+            # Update document record
+            document.path_array = new_path_array
+            document.file_path = str(new_file_path.absolute())
+            await db.commit()
+            await db.refresh(document)
+
+            return DocumentResponse(
+                id=document.id,
+                filename=document.filename,
+                path_array=document.path_array,
+                is_ingested=document.is_ingested,
+                created_at=(
+                    document.created_at.isoformat() if document.created_at else None
+                ),
+                updated_at=(
+                    document.updated_at.isoformat() if document.updated_at else None
+                ),
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error moving document: {str(e)}")
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 # Initialize and export the router

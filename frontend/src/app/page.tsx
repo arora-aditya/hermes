@@ -10,7 +10,7 @@ import { ConversationHistory } from './components/ConversationHistory';
 
 export default function Home() {
   const userId = 2;
-  const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles } = useFiles(userId);
+  const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles, moveFile, deleteFile } = useFiles(userId);
   const { conversations, isLoadingConversations, messages, isLoading, sendMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId } = useChat(userId);
 
   useEffect(() => {
@@ -30,6 +30,8 @@ export default function Home() {
         loading={loading}
         toggleFileSelection={toggleFileSelection}
         handleIndex={handleIndex}
+        moveFile={moveFile}
+        deleteFile={deleteFile}
       />
       <div className="flex-1 flex flex-col">
         <div className="flex justify-end p-4 border-b gap-2">
