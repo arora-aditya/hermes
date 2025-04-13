@@ -1,13 +1,14 @@
-from pydantic import BaseModel
 import logging
-from utils.vector_store import get_vector_store
+import os
+import re
 from typing import List, Optional
+
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_core.output_parsers import BaseOutputParser
 from langchain_core.prompts import PromptTemplate
+from pydantic import BaseModel
 from utils.llm import get_openai_llm
-import re
-import os
+from utils.vector_store import get_vector_store
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -53,10 +54,6 @@ class QueryOutputParser(BaseOutputParser[List[str]]):
 
         logger.debug(f"Parsed queries: {queries}")
         return queries
-
-
-class SearchRequest(BaseModel):
-    query: str
 
 
 class Search:

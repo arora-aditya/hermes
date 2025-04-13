@@ -41,6 +41,20 @@ class SearchRequest(BaseModel):
     sort_by_score: Optional[bool] = True
 
 
+class DocumentPrefixSearchRequest(BaseModel):
+    query: str = Field(..., description="Search query for filename or path")
+    similarity_threshold: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity threshold for fuzzy matching",
+    )
+
+
+class DocumentPrefixSearchResponse(BaseModel):
+    documents: List[DocumentResponse]
+
+
 class IngestRequest(BaseModel):
     document_ids: List[int] = Field(
         ..., description="List of document IDs to ingest", min_items=1

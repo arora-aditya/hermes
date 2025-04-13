@@ -9,7 +9,7 @@ import uvicorn
 from chat.agent import Agent, ChatRequest
 from chat.conversation import ConversationService
 from chat.rag_streaming import RAGStreamingAgent
-from controller import documents, organizations, users
+from controller import documents, organizations, search, users
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from load_env import IS_ENV_LOADED
@@ -97,6 +97,7 @@ logger.debug("Registering API routes")
 app.include_router(users.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
 app.include_router(documents.router)  # Documents router already has /api prefix
+app.include_router(search.router)  # Search router already has /api prefix
 logger.debug("API routes registered successfully")
 
 

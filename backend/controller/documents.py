@@ -1,3 +1,37 @@
+"""
+Document Management System
+========================
+
+1. Core Routes
+   ├── Upload (/upload)
+   ├── List (/user_id)
+   ├── Update/Delete (/document_id)
+   ├── Ingest (/ingest)
+   ├── Search (/search)
+   └── Move (/move/document_id)
+
+2. Document Operations
+   ├── File Management
+   │   ├── Upload & Storage
+   │   ├── Update & Delete
+   │   └── Directory Management
+   │
+   └── Processing
+       ├── PDF Ingestion
+       ├── Chunking
+       └── Embedding
+
+3. Data & Models
+   ├── Document/UserDocument
+   └── Response Schemas
+
+4. System Features
+   ├── Async Operations
+   ├── Error Handling
+   ├── Permission Management
+   └── Search Functionality
+"""
+
 import logging
 import os
 import shutil
