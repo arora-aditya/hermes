@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
-import { DirectoryTreeResponse, apiService, DirectoryTreeNode } from '@/services/api';
+import { DirectoryTreeResponse, apiService, DirectoryTreeNode, FileInfo, PrefixSearchResponse } from '@/services/api';
 import { toast } from 'sonner';
+
+export interface PrefixSearchState {
+    results: FileInfo[];
+    loading: boolean;
+    error: string | null;
+}
 
 export const useFiles = (userId: number) => {
     const [files, setFiles] = useState<DirectoryTreeResponse>({ children: [] });
     const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [prefixSearch, setPrefixSearch] = useState<PrefixSearchState>({
+        results: [],
+        loading: false,
+        error: null
+    });
 
     useEffect(() => {
         fetchFiles();
@@ -97,14 +108,40 @@ export const useFiles = (userId: number) => {
         }
     };
 
+    const searchFilesByPrefix = async (query: string, similarityThreshold?: number) => {
+        if (!query.trim()) {
+            setPrefixSearch({ results: [], loading: false, error: null });
+            return;
+        }
+
+        setPrefixSearch(prev => ({ ...prev, loading: true, error: null }));
+        try {
+            const response = await apiService.prefixSearch(userId, query, similarityThreshold);
+            setPrefixSearch({
+                results: response.documents,
+                loading: false,
+                error: null
+            });
+        } catch (error) {
+            console.error('Error searching files:', error);
+            setPrefixSearch(prev => ({
+                ...prev,
+                loading: false,
+                error: 'Failed to search files'
+            }));
+        }
+    };
+
     return {
         files,
         selectedFiles,
         loading,
+        prefixSearch,
         toggleFileSelection,
         handleIndex,
         fetchFiles,
         moveFile,
         deleteFile,
+        searchFilesByPrefix,
     };
 }; 

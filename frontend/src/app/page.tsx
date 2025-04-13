@@ -5,17 +5,38 @@ import { useFiles } from '@/hooks/useFiles';
 import { ChatHistory } from './components/ChatHistory';
 import { ChatInput } from './components/ChatInput';
 import { useChat } from '@/hooks/useChat';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ConversationHistory } from './components/ConversationHistory';
+import { FileInfo, apiService } from '@/services/api';
 
 export default function Home() {
   const userId = 2;
   const { files, selectedFiles, loading, toggleFileSelection, handleIndex, fetchFiles, moveFile, deleteFile } = useFiles(userId);
   const { conversations, isLoadingConversations, messages, isLoading, sendStreamingMessage, resetConversation, setCurrentConversation, createConversation, deleteConversation, conversationId, streamingStatus } = useChat(userId);
+  const [searchResults, setSearchResults] = useState<FileInfo[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     resetConversation();
   }, []);
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await apiService.prefixSearch(userId, query);
+      setSearchResults(response.documents);
+    } catch (error) {
+      console.error('Error searching files:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <div className="flex h-screen">
@@ -49,7 +70,13 @@ export default function Home() {
               <ChatHistory messages={messages} streamingStatus={streamingStatus} />
             </div>
             <div className="p-4 border-t">
-              <ChatInput onSendMessage={sendStreamingMessage} disabled={isLoading} />
+              <ChatInput
+                onSendMessage={sendStreamingMessage}
+                disabled={isLoading}
+                onSearch={handleSearch}
+                searchResults={searchResults}
+                isSearching={isSearching}
+              />
             </div>
           </div>
         </div>

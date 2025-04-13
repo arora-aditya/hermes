@@ -8,6 +8,7 @@ export interface FileInfo {
     is_ingested: boolean;
     created_at: string;
     updated_at?: string;
+    path_array?: string[];  // Adding path_array to match the search response
 }
 
 export interface DirectoryTreeNode {
@@ -89,6 +90,10 @@ export interface StreamingChatRequest {
     message: string;
     user_id: string;
     conversation_id?: string;
+}
+
+export interface PrefixSearchResponse {
+    documents: FileInfo[];
 }
 
 class ApiService {
@@ -279,6 +284,18 @@ class ApiService {
             console.error('Streaming chat error:', error);
             callbacks.onError?.(error instanceof Error ? error : new Error('Unknown streaming error'));
         }
+    }
+
+    async prefixSearch(userId: number, query: string, similarityThreshold?: number): Promise<PrefixSearchResponse> {
+        const params = new URLSearchParams({
+            query: query,
+            ...(similarityThreshold && { similarity_threshold: similarityThreshold.toString() })
+        });
+
+        const response = await this.api.get<PrefixSearchResponse>(
+            `/search/prefix/${userId}?${params.toString()}`
+        );
+        return response.data;
     }
 }
 
