@@ -1,16 +1,11 @@
-from pydantic import BaseModel, UUID4
 import os
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from models.conversation import Message, ConversationHistory
-from uuid import UUID
-from langchain_core.messages import AIMessage
+
 from chat.conversation import ConversationService
-from chat.conversation import ChatRequest, ChatResponse
-from langchain_core.tools import Tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
 from chat.tools import create_search_documents_tool
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate
+from schemas.conversation import ChatRequest, ChatResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from utils.llm import get_gemini_llm
 
 

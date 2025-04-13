@@ -2,28 +2,15 @@ import logging
 from typing import Dict, List
 from uuid import UUID
 
-from controller.documents import document_routes
 from fastapi import HTTPException
 from models.conversation import ConversationHistory, Message
-from pydantic import UUID4, BaseModel
-from schemas.document import SearchRequest
+from schemas.conversation import ChatRequest
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class ChatRequest(BaseModel):
-    message: str
-    conversation_id: UUID4 | None = None
-    user_id: str
-
-
-class ChatResponse(BaseModel):
-    message: str
-    conversation_id: UUID4
 
 
 class ConversationService:
