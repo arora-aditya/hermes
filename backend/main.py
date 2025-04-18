@@ -1,10 +1,10 @@
-import json
 import logging
 import time
 from contextlib import asynccontextmanager
 from typing import List
 from uuid import UUID
 
+import load_env
 import uvicorn
 from chat.agent import Agent, ChatRequest
 from chat.conversation import ConversationService
@@ -12,7 +12,6 @@ from chat.rag_streaming import RAGStreamingAgent
 from controller import documents, organizations, search, users
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from load_env import IS_ENV_LOADED
 from models.relationships import setup_relationships
 from schemas.streaming import StreamingChatRequest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     try:
-        if not IS_ENV_LOADED:
+        if not load_env.IS_ENV_LOADED:
             logger.error("Environment variables not loaded")
             raise Exception("Environment variables not loaded")
 

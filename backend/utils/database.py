@@ -1,9 +1,9 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import AsyncEngine
-import os
 import logging
+import os
+
 from models.base import Base
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,10 @@ class Database:
         return self.DATABASE_URL
 
 
-db = Database()
-
-
 # Make the database session available as a dependency
 async def get_db():
     """Database session dependency."""
+    db = Database()
     try:
         logger.debug("Starting database session")
         async for session in db.get_session():
